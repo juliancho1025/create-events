@@ -5,7 +5,7 @@
   "scripts": {
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm --parallel --filter \"./apps/*\" run dev",
     "dev:api": "pnpm --filter @events/api dev",
     "dev:web": "pnpm --filter @events/web dev",
     "build": "pnpm -r build",
