@@ -33,7 +33,7 @@ export function EditEventPage() {
           submitting={update.isPending}
           error={update.error?.message}
           onCancel={() => navigate(-1)}
-          onSubmit={(values) => update.mutate(values, { onSuccess: () => navigate(`/events/${id}`) })}
+          onSubmit={(values) => update.mutate(values, { onSuccess: () => void navigate(`/events/${id}`) })}
         />
       </Card>
     </YStack>

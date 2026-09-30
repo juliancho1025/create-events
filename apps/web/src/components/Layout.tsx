@@ -35,7 +35,7 @@ export function Layout() {
         borderBottomWidth={1}
         borderColor="$borderColor"
         bg="$background"
-        position={'sticky' as 'relative'}
+        position="sticky"
         t={0}
         z={10}
       >

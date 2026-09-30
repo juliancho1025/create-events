@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createApiClient, type ApiClient } from './api-client';
 
 /**
@@ -17,8 +17,9 @@ interface ApiContextValue {
   token: string | null;
   /** False until the stored token has been read. */
   ready: boolean;
-  signIn(token: string): Promise<void>;
-  signOut(): Promise<void>;
+  // Function properties (not methods) so they can be destructured safely.
+  signIn: (token: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const ApiContext = createContext<ApiContextValue | null>(null);
@@ -36,14 +37,15 @@ export function ApiProvider({
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const tokenRef = useRef<string | null>(null);
-  tokenRef.current = token;
 
   useEffect(() => {
-    storage.get().then((stored) => {
-      setToken(stored);
-      setReady(true);
-    });
+    void storage
+      .get()
+      .catch(() => null) // unreadable storage = logged out
+      .then((stored) => {
+        setToken(stored);
+        setReady(true);
+      });
   }, [storage]);
 
   const signOut = useCallback(async () => {
@@ -61,14 +63,15 @@ export function ApiProvider({
     [storage, queryClient],
   );
 
+  // Rebuilt when the token changes (cheap: it's a bag of closures).
   const api = useMemo(
     () =>
       createApiClient({
         baseUrl,
-        getToken: () => tokenRef.current,
+        getToken: () => token,
         onUnauthorized: () => void signOut(), // expired or revoked token
       }),
-    [baseUrl, signOut],
+    [baseUrl, token, signOut],
   );
 
   const value = useMemo(() => ({ api, token, ready, signIn, signOut }), [api, token, ready, signIn, signOut]);

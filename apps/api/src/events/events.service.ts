@@ -101,7 +101,7 @@ export class EventsService {
   }
 
   private async uploadImage(eventId: Types.ObjectId, image: Express.Multer.File): Promise<string> {
-    const key = `events/${eventId}/${randomUUID()}${extname(image.originalname).toLowerCase()}`;
+    const key = `events/${eventId.toHexString()}/${randomUUID()}${extname(image.originalname).toLowerCase()}`;
     await this.storage.put(key, image.buffer, image.mimetype);
     return key;
   }

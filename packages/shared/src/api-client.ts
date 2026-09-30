@@ -39,7 +39,8 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
     const res = await fetch(`${baseUrl}/api${path}`, { ...init, headers });
     if (res.status === 401 && token) onUnauthorized?.();
     if (!res.ok) {
-      const body = await res.json().catch(() => null);
+      // NestJS error shape; `message` is an array for validation errors.
+      const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
       const message = Array.isArray(body?.message) ? body.message.join('\n') : body?.message;
       throw new ApiError(res.status, message ?? res.statusText, body);
     }

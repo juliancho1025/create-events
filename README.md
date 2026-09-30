@@ -27,6 +27,8 @@ Open http://localhost:5173 and use the **dev login**. `admin@example.com` is the
 - OpenAPI / Swagger UI: http://localhost:3000/api/docs
 - Tests: `pnpm test` (boots the whole app against an in-memory MongoDB, no Docker needed)
 - Typecheck everything: `pnpm typecheck`
+- Lint everything: `pnpm lint` (`pnpm lint:fix` to auto-fix). ESLint + typescript-eslint with
+  type-aware rules (floating promises, unsafe `any`) and React hooks rules; config in `eslint.config.js`
 
 ### Enabling Google login
 

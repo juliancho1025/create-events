@@ -56,6 +56,8 @@ export function EventForm({
   const [image, setImage] = useState<PickedImage | null>(null);
   // Errors appear after the first submit attempt, then update live as fields are fixed.
   const [submitted, setSubmitted] = useState(false);
+  // Validation runs during render, which must stay pure, so "now" is captured once.
+  const [openedAt] = useState(() => Date.now());
 
   const validate = (): Errors => {
     const e: Errors = {};
@@ -63,7 +65,7 @@ export function EventForm({
     if (!address.trim()) e.address = 'Address is required';
     if (!description.trim()) e.description = 'Description is required';
     if (!startsAt) e.startsAt = 'Date and time are required';
-    else if (mode === 'create' && startsAt.getTime() <= Date.now()) e.startsAt = 'Must be in the future';
+    else if (mode === 'create' && startsAt.getTime() <= openedAt) e.startsAt = 'Must be in the future';
     const cap = Number(capacity);
     if (!Number.isInteger(cap) || cap < 1) e.capacity = 'Must be a whole number of at least 1';
     if (mode === 'create' && !image) e.image = 'An image is required';

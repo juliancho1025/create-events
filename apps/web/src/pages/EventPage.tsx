@@ -42,7 +42,7 @@ export function EventPage() {
             size="$3"
             theme="red"
             disabled={remove.isPending}
-            onPress={() => remove.mutate(id, { onSuccess: () => navigate('/', { replace: true }) })}
+            onPress={() => remove.mutate(id, { onSuccess: () => void navigate('/', { replace: true }) })}
           >
             Delete for everyone?
           </Button>

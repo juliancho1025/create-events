@@ -12,6 +12,8 @@ export const config = createTamagui({
 export type AppConfig = typeof config;
 
 declare module 'tamagui' {
+  // Tamagui's documented augmentation pattern: the interface must extend, not alias.
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface TamaguiCustomConfig extends AppConfig {}
 }
 

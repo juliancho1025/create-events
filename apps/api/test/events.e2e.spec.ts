@@ -52,7 +52,7 @@ describe('Events API (e2e)', () => {
       capacity: '2',
       ...fields,
     };
-    for (const [k, v] of Object.entries(values)) req.field(k, v!);
+    for (const [k, v] of Object.entries(values)) req.field(k, v);
     return req.attach('image', PNG, { filename: 'cover.png', contentType: 'image/png' });
   };
 

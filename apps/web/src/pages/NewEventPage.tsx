@@ -19,7 +19,7 @@ export function NewEventPage() {
           submitting={create.isPending}
           error={create.error?.message}
           onCancel={() => navigate(-1)}
-          onSubmit={(values) => create.mutate(values, { onSuccess: (event) => navigate(`/events/${event.id}`) })}
+          onSubmit={(values) => create.mutate(values, { onSuccess: (event) => void navigate(`/events/${event.id}`) })}
         />
       </Card>
     </YStack>

@@ -18,7 +18,7 @@ export function WebDateTimeInput({ id, value, onChange }: DateTimeInputProps) {
       type="datetime-local"
       value={value ? toLocalInputValue(value) : ''}
       onChange={(e) => {
-        const raw = (e.target as HTMLInputElement).value;
+        const raw = e.target.value;
         onChange(raw ? new Date(raw) : null);
       }}
     />
