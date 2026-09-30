@@ -1,0 +1,15 @@
+{
+  "name": "events-app",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev:api": "pnpm --filter @events/api dev",
+    "dev:web": "pnpm --filter @events/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}
