@@ -89,3 +89,12 @@ export function useCancelRegistration(eventId: string) {
   const invalidate = useInvalidateEvents();
   return useMutation({ mutationFn: () => api.cancelRegistration(eventId), onSettled: invalidate });
 }
+
+export function useKickAttendee(eventId: string) {
+  const api = useApi();
+  const invalidate = useInvalidateEvents();
+  return useMutation({
+    mutationFn: (userId: string) => api.kickAttendee(eventId, userId),
+    onSettled: invalidate,
+  });
+}

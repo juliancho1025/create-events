@@ -65,19 +65,15 @@ export class RegistrationsService {
   }
 
   async cancel(eventId: string, userId: string): Promise<void> {
-    const registration = await this.registrationModel.findOneAndDelete({
-      event: eventId,
-      user: userId,
-    });
-    if (!registration) throw new NotFoundException('You are not signed up for this event');
-    if (registration.status !== RegistrationStatus.CONFIRMED) return;
+    if (!(await this.removeRegistration(eventId, userId))) {
+      throw new NotFoundException('You are not signed up for this event');
+    }
+  }
 
-    // Hand the freed seat straight to the head of the waitlist (count unchanged)...
-    const promoted = await this.promoteNextWaitlisted(registration.event);
-    if (!promoted) {
-      // ...or give the seat back, then re-check in case someone got waitlisted meanwhile.
-      await this.releaseSeat(registration.event);
-      await this.fillOpenSeats(registration.event);
+  /** Admin removes someone else's sign-up; same seat handling as a self-cancel. */
+  async kick(eventId: string, userId: string): Promise<void> {
+    if (!(await this.removeRegistration(eventId, userId))) {
+      throw new NotFoundException('That user is not signed up for this event');
     }
   }
 
@@ -145,6 +141,25 @@ export class RegistrationsService {
 
   async deleteForEvent(eventId: Types.ObjectId): Promise<void> {
     await this.registrationModel.deleteMany({ event: eventId });
+  }
+
+  /** Deletes the sign-up and hands a freed seat on. Returns false if there was none. */
+  private async removeRegistration(eventId: string, userId: string): Promise<boolean> {
+    const registration = await this.registrationModel.findOneAndDelete({
+      event: eventId,
+      user: userId,
+    });
+    if (!registration) return false;
+    if (registration.status !== RegistrationStatus.CONFIRMED) return true;
+
+    // Hand the freed seat straight to the head of the waitlist (count unchanged)...
+    const promoted = await this.promoteNextWaitlisted(registration.event);
+    if (!promoted) {
+      // ...or give the seat back, then re-check in case someone got waitlisted meanwhile.
+      await this.releaseSeat(registration.event);
+      await this.fillOpenSeats(registration.event);
+    }
+    return true;
   }
 
   /** Atomically take a seat if one is free. Returns false when the event is full. */

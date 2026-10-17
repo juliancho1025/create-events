@@ -32,6 +32,7 @@ describe('Events API (e2e)', () => {
   let app: INestApplication;
   const storage = new InMemoryStorage();
   const tokens: Record<string, string> = {};
+  const userIds: Record<string, string> = {};
 
   const http = () => request(app.getHttpServer());
   const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -39,6 +40,7 @@ describe('Events API (e2e)', () => {
   const login = async (who: string, email: string) => {
     const res = await http().post('/api/auth/dev-login').send({ email, name: who }).expect(201);
     tokens[who] = res.body.accessToken;
+    userIds[who] = res.body.user.id;
     return res.body.user;
   };
 
@@ -206,6 +208,24 @@ describe('Events API (e2e)', () => {
     expect(grown).toMatchObject({ capacity: 2, confirmedCount: 2, waitlistCount: 1 });
 
     await http().patch(`/api/events/${event.id}`).set(as('admin')).field('capacity', '1').expect(400);
+  });
+
+  it('lets admins kick attendees, handing their seat to the waitlist', async () => {
+    const { body: event } = await createEvent({ capacity: '1' }).expect(201);
+    await signUp('alice', event.id).expect(201);
+    await signUp('bob', event.id).expect(201); // waitlisted
+    const kick = (who: string) => http().delete(`/api/events/${event.id}/registrations/${userIds[who]}`);
+
+    await kick('alice').set(as('bob')).expect(403);
+    await kick('alice').set(as('admin')).expect(204);
+
+    let detail = (await http().get(`/api/events/${event.id}`).set(as('bob'))).body;
+    expect(detail).toMatchObject({ confirmedCount: 1, waitlistCount: 0, myStatus: 'CONFIRMED' });
+    detail = (await http().get(`/api/events/${event.id}`).set(as('alice'))).body;
+    expect(detail.myStatus).toBeNull();
+
+    await kick('alice').set(as('admin')).expect(404);
+    await http().delete(`/api/events/${event.id}/registrations/not-an-id`).set(as('admin')).expect(400);
   });
 
   it('rejects sign-ups for events that already started', async () => {

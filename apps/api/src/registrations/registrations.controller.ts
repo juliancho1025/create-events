@@ -5,13 +5,14 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators.js';
+import { CurrentUser, Roles } from '../common/decorators.js';
 import { ParseObjectIdPipe } from '../common/parse-object-id.pipe.js';
-import type { AuthUser } from '../common/roles.js';
+import { Role, type AuthUser } from '../common/roles.js';
 import { AttendeesDto, RegistrationDto } from '../events/dto/event.dto.js';
 import { RegistrationsService } from './registrations.service.js';
 
@@ -38,6 +39,20 @@ export class RegistrationsController {
   @ApiNoContentResponse()
   cancel(@Param('eventId', ParseObjectIdPipe) eventId: string, @CurrentUser() user: AuthUser) {
     return this.registrations.cancel(eventId, user.id);
+  }
+
+  // Declared after `registrations/me` so "me" never reaches the ObjectId pipe.
+  @Delete('registrations/:userId')
+  @Roles(Role.ADMIN)
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Kick a user out of the event (admin; promotes the waitlist)' })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse({ description: 'User is not signed up for the event' })
+  kick(
+    @Param('eventId', ParseObjectIdPipe) eventId: string,
+    @Param('userId', ParseObjectIdPipe) userId: string,
+  ) {
+    return this.registrations.kick(eventId, userId);
   }
 
   @Get('attendees')

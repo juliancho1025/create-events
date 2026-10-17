@@ -1,10 +1,28 @@
 import type { Attendee, Attendees } from '@events/shared';
-import { Avatar, H5, Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
+import { UserX } from '@tamagui/lucide-icons-2';
+import { useState } from 'react';
+import { Avatar, Button, H5, Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 
-export function AttendeeList({ attendees, currentUserId }: { attendees: Attendees; currentUserId?: string }) {
+interface KickProps {
+  /** When set (admins only), each other attendee gets a "Remove" action. */
+  onKick?: (userId: string) => void;
+  kickPending?: boolean;
+}
+
+export function AttendeeList({
+  attendees,
+  currentUserId,
+  ...kick
+}: { attendees: Attendees; currentUserId?: string } & KickProps) {
   return (
     <YStack gap="$4">
-      <Section title={`Going (${attendees.confirmed.length})`} people={attendees.confirmed} currentUserId={currentUserId} empty="Nobody yet." />
+      <Section
+        title={`Going (${attendees.confirmed.length})`}
+        people={attendees.confirmed}
+        currentUserId={currentUserId}
+        empty="Nobody yet."
+        {...kick}
+      />
       {attendees.waitlist.length > 0 && (
         <>
           <Separator />
@@ -13,6 +31,7 @@ export function AttendeeList({ attendees, currentUserId }: { attendees: Attendee
             people={attendees.waitlist}
             currentUserId={currentUserId}
             numbered
+            {...kick}
           />
         </>
       )}
@@ -26,13 +45,16 @@ function Section({
   currentUserId,
   empty,
   numbered,
+  onKick,
+  kickPending,
 }: {
   title: string;
   people: Attendee[];
   currentUserId?: string;
   empty?: string;
   numbered?: boolean;
-}) {
+} & KickProps) {
+  const [confirmKick, setConfirmKick] = useState<string | null>(null);
   return (
     <YStack gap="$2.5">
       <H5>{title}</H5>
@@ -63,6 +85,28 @@ function Section({
               </Text>
             )}
           </YStack>
+          {onKick && person.userId !== currentUserId &&
+            (confirmKick === person.userId ? (
+              <XStack gap="$1">
+                <Button size="$2" theme="red" disabled={kickPending} onPress={() => onKick(person.userId)}>
+                  Kick out?
+                </Button>
+                <Button size="$2" chromeless onPress={() => setConfirmKick(null)}>
+                  Keep
+                </Button>
+              </XStack>
+            ) : (
+              <Button
+                size="$2"
+                chromeless
+                theme="red"
+                icon={<UserX size={14} />}
+                aria-label={`Remove ${person.name}`}
+                onPress={() => setConfirmKick(person.userId)}
+              >
+                Remove
+              </Button>
+            ))}
         </XStack>
       ))}
     </YStack>

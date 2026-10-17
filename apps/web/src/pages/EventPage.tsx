@@ -5,6 +5,7 @@ import {
   useCurrentUser,
   useDeleteEvent,
   useEvent,
+  useKickAttendee,
   useRegister,
 } from '@events/shared';
 import { AttendeeList, ErrorText, EventDetails } from '@events/ui';
@@ -23,6 +24,7 @@ export function EventPage() {
   const register = useRegister(id);
   const cancel = useCancelRegistration(id);
   const remove = useDeleteEvent();
+  const kick = useKickAttendee(id);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Attendee list is only visible to admins and people signed up (confirmed or waitlisted).
@@ -58,7 +60,7 @@ export function EventPage() {
     </XStack>
   );
 
-  const mutationError = register.error ?? cancel.error ?? remove.error;
+  const mutationError = register.error ?? cancel.error ?? remove.error ?? kick.error;
 
   return (
     <YStack gap="$5">
@@ -82,7 +84,12 @@ export function EventPage() {
         <Card flex={1} flexBasis={280} minW={260} maxW={420} p="$4" gap="$3" borderWidth={1} borderColor="$borderColor">
           {canSeeAttendees ? (
             attendees.data ? (
-              <AttendeeList attendees={attendees.data} currentUserId={user?.id} />
+              <AttendeeList
+                attendees={attendees.data}
+                currentUserId={user?.id}
+                onKick={isAdmin ? (userId) => kick.mutate(userId) : undefined}
+                kickPending={kick.isPending}
+              />
             ) : (
               <PageState loading={attendees.isPending} error={attendees.error} />
             )

@@ -83,6 +83,8 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
       request<RegistrationResult>(`/events/${eventId}/registrations`, { method: 'POST' }),
     cancelRegistration: (eventId: string) =>
       request<void>(`/events/${eventId}/registrations/me`, { method: 'DELETE' }),
+    kickAttendee: (eventId: string, userId: string) =>
+      request<void>(`/events/${eventId}/registrations/${userId}`, { method: 'DELETE' }),
     attendees: (eventId: string) => request<Attendees>(`/events/${eventId}/attendees`),
   };
 }
