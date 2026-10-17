@@ -2,6 +2,12 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { User } from '../users/user.schema.js';
 
+export interface EventMetric {
+  /** Slug of the label; joins marks across events in reports. */
+  key: string;
+  label: string;
+}
+
 @Schema({ timestamps: true })
 export class Event {
   @Prop({ required: true, trim: true, maxlength: 120 })
@@ -26,6 +32,10 @@ export class Event {
    */
   @Prop({ required: true, default: 0, min: 0 })
   confirmedCount: number;
+
+  /** What admins can mark attendees with (no-show, tardiness...). Order is display order. */
+  @Prop({ type: [{ _id: false, key: { type: String, required: true }, label: { type: String, required: true } }], default: [] })
+  metrics: EventMetric[];
 
   /** Object key in the S3 bucket. */
   @Prop({ required: true })

@@ -1,7 +1,28 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDate, IsInt, IsNotEmpty, IsString, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsDate,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { EventMetricDto } from '../../metrics/metrics.dto.js';
 import { RegistrationStatus } from '../../registrations/registration.schema.js';
+
+/** Multipart can't carry arrays of strings reliably, so `metrics` arrives as a JSON string. */
+const parseJsonArray = ({ value }: { value: unknown }) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value; // fails @IsArray with a readable message
+  }
+};
 
 /**
  * Sent as multipart/form-data together with an `image` file, so numbers and
@@ -36,6 +57,19 @@ export class CreateEventDto {
   @IsInt()
   @Min(1)
   capacity: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'JSON array of metric names, e.g. ["No-show","Tardiness"]. Omit for none (create) / unchanged (update).',
+  })
+  @IsOptional()
+  @Transform(parseJsonArray)
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @MaxLength(40, { each: true })
+  metrics?: string[];
 }
 
 export class UpdateEventDto extends PartialType(CreateEventDto) {}
@@ -50,6 +84,7 @@ export class EventDto {
   @ApiProperty() capacity: number;
   @ApiProperty() confirmedCount: number;
   @ApiProperty() waitlistCount: number;
+  @ApiProperty({ type: [EventMetricDto] }) metrics: EventMetricDto[];
   @ApiPropertyOptional({ enum: RegistrationStatus, nullable: true })
   myStatus: RegistrationStatus | null;
   @ApiPropertyOptional({ nullable: true, description: '1-based position if waitlisted' })
@@ -62,6 +97,8 @@ export class AttendeeDto {
   @ApiPropertyOptional() avatarUrl?: string;
   @ApiPropertyOptional({ description: 'Only included for admins' }) email?: string;
   @ApiProperty({ type: String, format: 'date-time' }) registeredAt: string;
+  @ApiPropertyOptional({ type: [String], description: 'Marked metric keys; only included for admins' })
+  metrics?: string[];
 }
 
 export class AttendeesDto {

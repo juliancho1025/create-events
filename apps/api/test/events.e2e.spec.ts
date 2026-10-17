@@ -228,6 +228,83 @@ describe('Events API (e2e)', () => {
     await http().delete(`/api/events/${event.id}/registrations/not-an-id`).set(as('admin')).expect(400);
   });
 
+  describe('metrics', () => {
+    const markUrl = (eventId: string, metric: string, who: string) =>
+      `/api/events/${eventId}/metrics/${metric}/users/${userIds[who]}`;
+
+    it('stores metric definitions on the event, deduped by key', async () => {
+      const { body: event } = await createEvent({ metrics: JSON.stringify(['No-show', 'no show', ' Tardiness ']) }).expect(201);
+      expect(event.metrics).toEqual([
+        { key: 'no-show', label: 'No-show' },
+        { key: 'tardiness', label: 'Tardiness' },
+      ]);
+      expect((await createEvent().expect(201)).body.metrics).toEqual([]);
+      await createEvent({ metrics: 'not json' }).expect(400);
+    });
+
+    it('lets admins mark confirmed attendees and shows marks only to admins', async () => {
+      const { body: event } = await createEvent({ capacity: '1', metrics: '["No-show","Late payment"]' }).expect(201);
+      await signUp('alice', event.id).expect(201);
+      await signUp('bob', event.id).expect(201); // waitlisted
+
+      await http().put(markUrl(event.id, 'no-show', 'alice')).set(as('bob')).expect(403);
+      await http().put(markUrl(event.id, 'no-show', 'alice')).set(as('admin')).expect(204);
+      await http().put(markUrl(event.id, 'no-show', 'alice')).set(as('admin')).expect(204); // idempotent
+      await http().put(markUrl(event.id, 'tardiness', 'alice')).set(as('admin')).expect(404);
+      await http().put(markUrl(event.id, 'no-show', 'bob')).set(as('admin')).expect(400);
+
+      const forAdmin = (await http().get(`/api/events/${event.id}/attendees`).set(as('admin'))).body;
+      expect(forAdmin.confirmed[0].metrics).toEqual(['no-show']);
+      expect(forAdmin.waitlist[0].metrics).toEqual([]);
+      const forAlice = (await http().get(`/api/events/${event.id}/attendees`).set(as('alice'))).body;
+      expect(forAlice.confirmed[0].metrics).toBeUndefined();
+
+      await http().delete(markUrl(event.id, 'no-show', 'alice')).set(as('admin')).expect(204);
+      const after = (await http().get(`/api/events/${event.id}/attendees`).set(as('admin'))).body;
+      expect(after.confirmed[0].metrics).toEqual([]);
+    });
+
+    it('drops marks of a metric removed from the event', async () => {
+      const { body: event } = await createEvent({ metrics: '["No-show","Tardiness"]' }).expect(201);
+      await signUp('alice', event.id).expect(201);
+      await http().put(markUrl(event.id, 'no-show', 'alice')).set(as('admin')).expect(204);
+      await http().put(markUrl(event.id, 'tardiness', 'alice')).set(as('admin')).expect(204);
+
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('metrics', '["Tardiness"]').expect(200);
+      const list = (await http().get(`/api/events/${event.id}/attendees`).set(as('admin'))).body;
+      expect(list.confirmed[0].metrics).toEqual(['tardiness']);
+    });
+
+    it('reports per-user and per-event rates over started events', async () => {
+      // Sign up while upcoming, then move the event into the past.
+      const make = async (people: string[]) => {
+        const { body: event } = await createEvent({ capacity: '5', metrics: '["Report no-show"]' }).expect(201);
+        for (const p of people) await signUp(p, event.id).expect(201);
+        await http().patch(`/api/events/${event.id}`).set(as('admin'))
+          .field('startsAt', new Date(Date.now() - 3_600_000).toISOString()).expect(200);
+        return event.id as string;
+      };
+      const first = await make(['alice', 'bob']);
+      const second = await make(['alice', 'carol']);
+      await http().put(markUrl(first, 'report-no-show', 'alice')).set(as('admin')).expect(204);
+      await http().put(markUrl(second, 'report-no-show', 'alice')).set(as('admin')).expect(204);
+      // A kicked no-show keeps their record.
+      await http().put(markUrl(second, 'report-no-show', 'carol')).set(as('admin')).expect(204);
+      await http().delete(`/api/events/${second}/registrations/${userIds.carol}`).set(as('admin')).expect(204);
+
+      await http().get('/api/metrics/report').set(as('alice')).expect(403);
+      const report = (await http().get('/api/metrics/report').set(as('admin')).expect(200)).body;
+      expect(report.metrics).toContainEqual({ key: 'report-no-show', label: 'Report no-show' });
+      const stat = (who: string) =>
+        report.users.find((u: { userId: string }) => u.userId === userIds[who]).stats['report-no-show'];
+      expect(stat('alice')).toEqual({ count: 2, opportunities: 2 });
+      expect(stat('bob')).toEqual({ count: 0, opportunities: 1 });
+      expect(stat('carol')).toEqual({ count: 1, opportunities: 1 });
+      const row = report.events.find((e: { eventId: string }) => e.eventId === second);
+      expect(row.stats['report-no-show']).toEqual({ count: 2, opportunities: 2 });
+    });
+  });
+
   it('rejects sign-ups for events that already started', async () => {
     const { body: event } = await createEvent({ startsAt: new Date(Date.now() - 60_000).toISOString() }).expect(201);
     await signUp('alice', event.id).expect(400);

@@ -10,6 +10,7 @@ import { EditEventPage } from './pages/EditEventPage';
 import { EventPage } from './pages/EventPage';
 import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
+import { MetricsPage } from './pages/MetricsPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { localTokenStorage } from './tokenStorage';
 
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
             children: [
               { path: 'events/new', element: <NewEventPage /> },
               { path: 'events/:id/edit', element: <EditEventPage /> },
+              { path: 'metrics', element: <MetricsPage /> },
             ],
           },
         ],

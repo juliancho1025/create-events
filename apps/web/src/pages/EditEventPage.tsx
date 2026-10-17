@@ -27,6 +27,7 @@ export function EditEventPage() {
             startsAt: new Date(event.startsAt),
             capacity: event.capacity,
             imageUri: api.resolveUrl(event.imageUrl),
+            metrics: event.metrics.map((m) => m.label),
           }}
           DateTimeInput={WebDateTimeInput}
           ImageInput={WebImageInput}

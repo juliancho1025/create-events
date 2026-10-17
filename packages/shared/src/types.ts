@@ -25,7 +25,17 @@ export interface EventItem {
   waitlistCount: number;
   myStatus: RegistrationStatus | null;
   myWaitlistPosition: number | null;
+  metrics: EventMetric[];
 }
+
+export interface EventMetric {
+  /** Slug of the label, e.g. 'no-show'. Same key on different events = same metric. */
+  key: string;
+  label: string;
+}
+
+/** Pre-selected when creating an event; admins can remove them or add their own. */
+export const RECOMMENDED_METRICS = ['No-show', 'Tardiness', 'Late payment'];
 
 export interface Attendee {
   userId: string;
@@ -33,6 +43,8 @@ export interface Attendee {
   avatarUrl?: string;
   email?: string;
   registeredAt: string;
+  /** Marked metric keys. Admins only. */
+  metrics?: string[];
 }
 
 export interface Attendees {
@@ -62,6 +74,21 @@ export interface EventInput {
   description: string;
   startsAt: Date;
   capacity: number;
+  /** Metric names to track. */
+  metrics: string[];
   /** Required on create, optional on update. */
   image?: UploadableImage;
+}
+
+export interface MetricCount {
+  count: number;
+  /** Tracked attendances: the rate denominator. */
+  opportunities: number;
+}
+
+export interface MetricsReport {
+  metrics: EventMetric[];
+  users: { userId: string; name: string; email: string; avatarUrl?: string; stats: Record<string, MetricCount> }[];
+  /** Oldest first. */
+  events: { eventId: string; name: string; startsAt: string; stats: Record<string, MetricCount> }[];
 }

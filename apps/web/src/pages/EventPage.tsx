@@ -7,6 +7,7 @@ import {
   useEvent,
   useKickAttendee,
   useRegister,
+  useSetMetric,
 } from '@events/shared';
 import { AttendeeList, ErrorText, EventDetails } from '@events/ui';
 import { ArrowLeft, Lock, Pencil, Trash2 } from '@tamagui/lucide-icons-2';
@@ -25,6 +26,7 @@ export function EventPage() {
   const cancel = useCancelRegistration(id);
   const remove = useDeleteEvent();
   const kick = useKickAttendee(id);
+  const setMetric = useSetMetric(id);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Attendee list is only visible to admins and people signed up (confirmed or waitlisted).
@@ -60,7 +62,7 @@ export function EventPage() {
     </XStack>
   );
 
-  const mutationError = register.error ?? cancel.error ?? remove.error ?? kick.error;
+  const mutationError = register.error ?? cancel.error ?? remove.error ?? kick.error ?? setMetric.error;
 
   return (
     <YStack gap="$5">
@@ -89,6 +91,10 @@ export function EventPage() {
                 currentUserId={user?.id}
                 onKick={isAdmin ? (userId) => kick.mutate(userId) : undefined}
                 kickPending={kick.isPending}
+                metrics={event.metrics}
+                onToggleMetric={
+                  isAdmin ? (userId, metric, marked) => setMetric.mutate({ userId, metric, marked }) : undefined
+                }
               />
             ) : (
               <PageState loading={attendees.isPending} error={attendees.error} />

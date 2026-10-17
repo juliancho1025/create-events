@@ -10,6 +10,7 @@ import { Model, Types } from 'mongoose';
 import { Role, type AuthUser } from '../common/roles.js';
 import { Event } from '../events/event.schema.js';
 import type { AttendeeDto, AttendeesDto, RegistrationDto } from '../events/dto/event.dto.js';
+import { MetricsService } from '../metrics/metrics.service.js';
 import type { User } from '../users/user.schema.js';
 import { Registration, RegistrationDocument, RegistrationStatus } from './registration.schema.js';
 
@@ -31,6 +32,7 @@ export class RegistrationsService {
   constructor(
     @InjectModel(Registration.name) private readonly registrationModel: Model<Registration>,
     @InjectModel(Event.name) private readonly eventModel: Model<Event>,
+    private readonly metrics: MetricsService,
   ) {}
 
   async register(eventId: string, userId: string): Promise<RegistrationDto> {
@@ -96,10 +98,13 @@ export class RegistrationsService {
       throw new ForbiddenException('Only attendees can see who is attending');
     }
 
-    const registrations = await this.registrationModel
-      .find({ event: eventId })
-      .sort(WAITLIST_ORDER)
-      .populate<{ user: User & { _id: Types.ObjectId } }>('user', 'name avatarUrl email');
+    const [registrations, marks] = await Promise.all([
+      this.registrationModel
+        .find({ event: eventId })
+        .sort(WAITLIST_ORDER)
+        .populate<{ user: User & { _id: Types.ObjectId } }>('user', 'name avatarUrl email'),
+      isAdmin ? this.metrics.marksByUser(eventId) : null,
+    ]);
 
     const toDto = (r: (typeof registrations)[number]): AttendeeDto => ({
       userId: r.user._id.toString(),
@@ -107,6 +112,7 @@ export class RegistrationsService {
       avatarUrl: r.user.avatarUrl,
       ...(isAdmin && { email: r.user.email }),
       registeredAt: r.createdAt.toISOString(),
+      ...(marks && { metrics: marks.get(r.user._id.toString()) ?? [] }),
     });
 
     return {

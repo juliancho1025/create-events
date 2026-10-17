@@ -1,7 +1,7 @@
 import { useApiContext, useCurrentUser } from '@events/shared';
 import { initials } from '@events/ui';
-import { CalendarDays, LogOut } from '@tamagui/lucide-icons-2';
-import { Link, Navigate, Outlet, useLocation } from 'react-router';
+import { BarChart3, CalendarDays, LogOut } from '@tamagui/lucide-icons-2';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { Avatar, Button, Text, XStack, YStack } from 'tamagui';
 import { PageState } from './PageState';
 
@@ -24,6 +24,7 @@ export function RequireAdmin() {
 export function Layout() {
   const { user, isAdmin } = useCurrentUser();
   const { signOut } = useApiContext();
+  const navigate = useNavigate();
 
   return (
     <YStack minH="100vh">
@@ -49,6 +50,11 @@ export function Layout() {
         </Link>
         {user && (
           <XStack gap="$3" items="center">
+            {isAdmin && (
+              <Button size="$3" chromeless icon={<BarChart3 size={16} />} onPress={() => navigate('/metrics')}>
+                Metrics
+              </Button>
+            )}
             <Avatar circular size="$3">
               {user.avatarUrl && <Avatar.Image src={user.avatarUrl} />}
               <Avatar.Fallback bg="$color5" items="center" justify="center">

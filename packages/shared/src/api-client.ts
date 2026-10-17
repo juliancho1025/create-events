@@ -4,6 +4,7 @@ import type {
   EventInput,
   EventItem,
   EventScope,
+  MetricsReport,
   RegistrationResult,
   User,
 } from './types';
@@ -54,6 +55,7 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
     if (input.description !== undefined) form.append('description', input.description);
     if (input.startsAt !== undefined) form.append('startsAt', input.startsAt.toISOString());
     if (input.capacity !== undefined) form.append('capacity', String(input.capacity));
+    if (input.metrics !== undefined) form.append('metrics', JSON.stringify(input.metrics));
     // RN's FormData accepts { uri, name, type }; the DOM typings only know Blob.
     if (input.image) form.append('image', input.image as Blob);
     return form;
@@ -86,5 +88,11 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
     kickAttendee: (eventId: string, userId: string) =>
       request<void>(`/events/${eventId}/registrations/${userId}`, { method: 'DELETE' }),
     attendees: (eventId: string) => request<Attendees>(`/events/${eventId}/attendees`),
+
+    setMetric: (eventId: string, metric: string, userId: string, marked: boolean) =>
+      request<void>(`/events/${eventId}/metrics/${encodeURIComponent(metric)}/users/${userId}`, {
+        method: marked ? 'PUT' : 'DELETE',
+      }),
+    metricsReport: () => request<MetricsReport>('/metrics/report'),
   };
 }

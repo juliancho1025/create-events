@@ -3,10 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type QueryFilter } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
+import { metricKey } from '../metrics/metric-key.js';
+import { MetricsService } from '../metrics/metrics.service.js';
 import { RegistrationsService, type EventRegistrationStats } from '../registrations/registrations.service.js';
 import { StorageService, type StoredObject } from '../storage/storage.service.js';
 import { CreateEventDto, EventDto, UpdateEventDto } from './dto/event.dto.js';
-import { Event, EventDocument } from './event.schema.js';
+import { Event, EventDocument, type EventMetric } from './event.schema.js';
 
 export type EventScope = 'upcoming' | 'past' | 'all';
 
@@ -17,6 +19,7 @@ export class EventsService {
   constructor(
     @InjectModel(Event.name) private readonly eventModel: Model<Event>,
     private readonly registrations: RegistrationsService,
+    private readonly metrics: MetricsService,
     private readonly storage: StorageService,
   ) {}
 
@@ -43,6 +46,7 @@ export class EventsService {
     const imageKey = await this.uploadImage(_id, image);
     const event = await this.eventModel.create({
       ...dto,
+      metrics: toMetrics(dto.metrics ?? []),
       _id,
       imageKey,
       imageContentType: image.mimetype,
@@ -58,7 +62,9 @@ export class EventsService {
     adminId: string,
   ): Promise<EventDto> {
     const event = await this.findOrThrow(id);
-    const update: Partial<Event> = { ...dto };
+    const { metrics, ...fields } = dto;
+    const update: Partial<Event> = { ...fields };
+    if (metrics) update.metrics = toMetrics(metrics);
     if (image) {
       update.imageKey = await this.uploadImage(event._id, image);
       update.imageContentType = image.mimetype;
@@ -76,6 +82,12 @@ export class EventsService {
     }
 
     if (update.imageKey) await this.deleteImageQuietly(event.imageKey);
+    if (update.metrics) {
+      // A metric taken off the event takes its marks with it, so reports never count a hidden metric.
+      const kept = new Set(update.metrics.map((m) => m.key));
+      const removed = event.metrics.map((m) => m.key).filter((key) => !kept.has(key));
+      if (removed.length) await this.metrics.deleteForEvent(event._id, removed);
+    }
     if (dto.capacity !== undefined && dto.capacity > event.capacity) {
       await this.registrations.fillOpenSeats(event._id);
     }
@@ -85,6 +97,7 @@ export class EventsService {
   async remove(id: string): Promise<void> {
     const event = await this.findOrThrow(id);
     await this.registrations.deleteForEvent(event._id);
+    await this.metrics.deleteForEvent(event._id);
     await event.deleteOne();
     await this.deleteImageQuietly(event.imageKey);
   }
@@ -126,7 +139,19 @@ export class EventsService {
       startsAt: event.startsAt.toISOString(),
       capacity: event.capacity,
       confirmedCount: event.confirmedCount,
+      metrics: event.metrics.map(({ key, label }) => ({ key, label })),
       ...stats,
     };
   }
+}
+
+/** Names -> metrics, dropping blanks and duplicates ("No-show" and "no show" are one metric). */
+function toMetrics(labels: string[]): EventMetric[] {
+  const byKey = new Map<string, EventMetric>();
+  for (const raw of labels) {
+    const label = raw.trim();
+    const key = metricKey(label);
+    if (key && !byKey.has(key)) byKey.set(key, { key, label });
+  }
+  return [...byKey.values()];
 }

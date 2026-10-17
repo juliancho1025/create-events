@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi, useApiContext } from './auth';
-import type { EventInput, EventScope } from './types';
+import type { Attendees, EventInput, EventScope } from './types';
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -9,6 +9,7 @@ export const queryKeys = {
   eventList: (scope: EventScope) => ['events', 'list', scope] as const,
   event: (id: string) => ['events', 'detail', id] as const,
   attendees: (id: string) => ['events', 'attendees', id] as const,
+  metricsReport: ['events', 'metrics-report'] as const,
 };
 
 /** Current user, or undefined while logged out. `isAdmin` drives admin-only UI. */
@@ -96,5 +97,40 @@ export function useKickAttendee(eventId: string) {
   return useMutation({
     mutationFn: (userId: string) => api.kickAttendee(eventId, userId),
     onSettled: invalidate,
+  });
+}
+
+export function useMetricsReport() {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.metricsReport, queryFn: api.metricsReport });
+}
+
+/** Toggles a metric for one attendee, optimistically: admins click through a list quickly. */
+export function useSetMetric(eventId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const key = queryKeys.attendees(eventId);
+  type Vars = { metric: string; userId: string; marked: boolean };
+  return useMutation({
+    mutationFn: ({ metric, userId, marked }: Vars) => api.setMetric(eventId, metric, userId, marked),
+    onMutate: async ({ metric, userId, marked }: Vars) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Attendees>(key);
+      if (previous) {
+        const toggle = (list: Attendees['confirmed']) =>
+          list.map((a) =>
+            a.userId !== userId
+              ? a
+              : { ...a, metrics: marked ? [...(a.metrics ?? []), metric] : (a.metrics ?? []).filter((m) => m !== metric) },
+          );
+        queryClient.setQueryData<Attendees>(key, { confirmed: toggle(previous.confirmed), waitlist: previous.waitlist });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => ctx?.previous && queryClient.setQueryData(key, ctx.previous),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.metricsReport });
+    },
   });
 }

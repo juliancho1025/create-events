@@ -1,6 +1,7 @@
-import type { EventInput, UploadableImage } from '@events/shared';
+import { RECOMMENDED_METRICS, type EventInput, type UploadableImage } from '@events/shared';
 import { useState, type ComponentType } from 'react';
 import { Button, Form, Input, Label, Paragraph, Spinner, TextArea, Theme, XStack, YStack } from 'tamagui';
+import { MetricsEditor } from './MetricsEditor';
 
 export interface PickedImage {
   file: UploadableImage;
@@ -26,7 +27,15 @@ export interface ImageInputProps {
 
 export interface EventFormProps {
   mode: 'create' | 'edit';
-  initial?: { name: string; address: string; description: string; startsAt: Date; capacity: number; imageUri: string };
+  initial?: {
+    name: string;
+    address: string;
+    description: string;
+    startsAt: Date;
+    capacity: number;
+    imageUri: string;
+    metrics: string[];
+  };
   DateTimeInput: ComponentType<DateTimeInputProps>;
   ImageInput: ComponentType<ImageInputProps>;
   onSubmit: (values: EventInput) => void;
@@ -54,6 +63,8 @@ export function EventForm({
   const [startsAt, setStartsAt] = useState<Date | null>(initial?.startsAt ?? null);
   const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : '20');
   const [image, setImage] = useState<PickedImage | null>(null);
+  const [metrics, setMetrics] = useState<string[]>(initial?.metrics ?? RECOMMENDED_METRICS);
+  const removedMetrics = initial?.metrics.filter((m) => !metrics.includes(m)) ?? [];
   // Errors appear after the first submit attempt, then update live as fields are fixed.
   const [submitted, setSubmitted] = useState(false);
   // Validation runs during render, which must stay pure, so "now" is captured once.
@@ -83,6 +94,7 @@ export function EventForm({
       description: description.trim(),
       startsAt: startsAt!,
       capacity: Number(capacity),
+      metrics,
       image: image?.file,
     });
   };
@@ -112,6 +124,16 @@ export function EventForm({
       </Field>
       <Field id="image" label="Image" error={errors.image}>
         <ImageInput value={image} existingUri={initial?.imageUri} onChange={setImage} />
+      </Field>
+
+      <Field id="metrics" label="Attendee metrics">
+        <Paragraph fontSize="$2" color="$color10" mt="$-1">
+          Things you can mark attendees with after the event. They add up across events in the Metrics report.
+        </Paragraph>
+        <MetricsEditor value={metrics} onChange={setMetrics} />
+        {removedMetrics.length > 0 && (
+          <ErrorText>Saving deletes this event's marks for: {removedMetrics.join(', ')}.</ErrorText>
+        )}
       </Field>
 
       {error && <ErrorText>{error}</ErrorText>}
