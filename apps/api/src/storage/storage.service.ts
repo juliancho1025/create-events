@@ -16,6 +16,9 @@ export interface StoredObject {
   contentLength?: number;
 }
 
+/** ~30s: enough for a cold SeaweedFS container, short enough to fail clearly when it's not running. */
+const STARTUP_ATTEMPTS = 30;
+
 /** Thin wrapper over any S3-compatible store (SeaweedFS locally, AWS S3 in production). */
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -36,12 +39,28 @@ export class StorageService implements OnModuleInit {
     });
   }
 
+  /**
+   * Ensure the bucket exists. Retries while the store is unreachable, because
+   * `pnpm infra:up && pnpm dev` starts the API before SeaweedFS finishes booting
+   * (it accepts connections, then resets them, for several seconds).
+   */
   async onModuleInit() {
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch {
-      this.logger.log(`Creating bucket "${this.bucket}"`);
-      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+        return;
+      } catch (err) {
+        const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+        if (status === 404) {
+          this.logger.log(`Creating bucket "${this.bucket}"`);
+          await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+          return;
+        }
+        // An HTTP answer (403...) won't fix itself; only retry when the store didn't answer.
+        if (status !== undefined || attempt >= STARTUP_ATTEMPTS) throw err;
+        if (attempt === 1) this.logger.warn(`Object storage not reachable yet (${(err as Error).message}), retrying...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
   }
 
