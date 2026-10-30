@@ -37,6 +37,14 @@ Open http://localhost:5173 and use the **dev login**. `admin@example.com` is the
 3. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `apps/api/.env`, restart the API.
 4. Set `DEV_LOGIN_ENABLED=false` anywhere that isn't your laptop.
 
+### Enabling push notifications
+
+1. `npx web-push generate-vapid-keys`
+2. Put them in `apps/api/.env` as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (plus a `VAPID_SUBJECT` contact), restart the API.
+3. In the app, click the bell in the header and allow notifications. Without keys the bell is greyed out.
+
+Browsers allow push only on `https` or `localhost`.
+
 ## Layout
 
 ```
@@ -102,3 +110,10 @@ that the Nest CLI and other tools depend on. Nest 12 still ships with TS 6.
   The image type already accepts RN's `{ uri, name, type }`.
 - Use `expo-router` screens in place of the web `pages/`, and `expo-auth-session` for Google
   login (the API's OAuth callback would need a redirect target for the app scheme).
+
+**Push notifications.** Standard Web Push (VAPID + `apps/web/public/sw.js`); each browser a user turns
+the bell on in is one `PushSubscription`, and ones the push service reports gone (404/410) are deleted.
+Admins program notifications in the event form as "N minutes/hours/days before"; they're stored relative
+to the start, so moving the event moves them. A 30 s poller claims each due one with an atomic
+`PENDING -> SENT` update (sent once, even with several API instances) and pushes it to confirmed attendees.
+Someone promoted off the waitlist also gets a push.

@@ -1,7 +1,8 @@
-import { RECOMMENDED_METRICS, type EventInput, type UploadableImage } from '@events/shared';
+import { RECOMMENDED_METRICS, type EventInput, type NotificationInput, type UploadableImage } from '@events/shared';
 import { useState, type ComponentType } from 'react';
 import { Button, Form, Input, Label, Paragraph, Spinner, TextArea, Theme, XStack, YStack } from 'tamagui';
 import { MetricsEditor } from './MetricsEditor';
+import { fromDraft, NotificationsEditor, toDraft, type NotificationDraft } from './NotificationsEditor';
 
 export interface PickedImage {
   file: UploadableImage;
@@ -35,6 +36,10 @@ export interface EventFormProps {
     capacity: number;
     imageUri: string;
     metrics: string[];
+    /** Pending programmed notifications (editable). */
+    notifications: NotificationInput[];
+    /** Already sent (shown read-only). */
+    sentNotifications: NotificationInput[];
   };
   DateTimeInput: ComponentType<DateTimeInputProps>;
   ImageInput: ComponentType<ImageInputProps>;
@@ -65,6 +70,9 @@ export function EventForm({
   const [image, setImage] = useState<PickedImage | null>(null);
   const [metrics, setMetrics] = useState<string[]>(initial?.metrics ?? RECOMMENDED_METRICS);
   const removedMetrics = initial?.metrics.filter((m) => !metrics.includes(m)) ?? [];
+  const [notifications, setNotifications] = useState<NotificationDraft[]>(
+    () => initial?.notifications.map(toDraft) ?? [],
+  );
   // Errors appear after the first submit attempt, then update live as fields are fixed.
   const [submitted, setSubmitted] = useState(false);
   // Validation runs during render, which must stay pure, so "now" is captured once.
@@ -83,11 +91,14 @@ export function EventForm({
     return e;
   };
 
+  const parsedNotifications = notifications.map(fromDraft);
+  const notificationErrors = parsedNotifications.map((n) => (typeof n === 'string' ? n : undefined));
+
   const errors: Errors = submitted ? validate() : {};
 
   const submit = () => {
     setSubmitted(true);
-    if (Object.keys(validate()).length) return;
+    if (Object.keys(validate()).length || notificationErrors.some(Boolean)) return;
     onSubmit({
       name: name.trim(),
       address: address.trim(),
@@ -95,6 +106,7 @@ export function EventForm({
       startsAt: startsAt!,
       capacity: Number(capacity),
       metrics,
+      notifications: parsedNotifications as NotificationInput[],
       image: image?.file,
     });
   };
@@ -134,6 +146,20 @@ export function EventForm({
         {removedMetrics.length > 0 && (
           <ErrorText>Saving deletes this event's marks for: {removedMetrics.join(', ')}.</ErrorText>
         )}
+      </Field>
+
+      <Field id="notifications" label="Push notifications">
+        <Paragraph fontSize="$2" color="$color10" mt="$-1">
+          Sent to confirmed attendees who turned on notifications. They move with the event if you change its date.
+        </Paragraph>
+        <NotificationsEditor
+          value={notifications}
+          onChange={setNotifications}
+          errors={submitted ? notificationErrors : undefined}
+          startsAt={startsAt}
+          now={openedAt}
+          sent={initial?.sentNotifications}
+        />
       </Field>
 
       {error && <ErrorText>{error}</ErrorText>}

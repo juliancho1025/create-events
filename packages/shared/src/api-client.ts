@@ -5,7 +5,12 @@ import type {
   EventItem,
   EventScope,
   MetricsReport,
+  PushSubscriptionInput,
   RegistrationResult,
+  Review,
+  ReviewInput,
+  Reviews,
+  ScheduledNotification,
   User,
 } from './types';
 
@@ -56,6 +61,7 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
     if (input.startsAt !== undefined) form.append('startsAt', input.startsAt.toISOString());
     if (input.capacity !== undefined) form.append('capacity', String(input.capacity));
     if (input.metrics !== undefined) form.append('metrics', JSON.stringify(input.metrics));
+    if (input.notifications !== undefined) form.append('notifications', JSON.stringify(input.notifications));
     // RN's FormData accepts { uri, name, type }; the DOM typings only know Blob.
     if (input.image) form.append('image', input.image as Blob);
     return form;
@@ -94,5 +100,19 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
         method: marked ? 'PUT' : 'DELETE',
       }),
     metricsReport: () => request<MetricsReport>('/metrics/report'),
+
+    reviews: (eventId: string) => request<Reviews>(`/events/${eventId}/reviews`),
+    saveReview: (eventId: string, input: ReviewInput) =>
+      request<Review>(`/events/${eventId}/reviews/me`, { method: 'PUT', body: JSON.stringify(input) }),
+    deleteReview: (eventId: string, userId = 'me') =>
+      request<void>(`/events/${eventId}/reviews/${userId}`, { method: 'DELETE' }),
+
+    eventNotifications: (eventId: string) =>
+      request<ScheduledNotification[]>(`/events/${eventId}/notifications`),
+    pushPublicKey: () => request<{ publicKey: string | null }>('/push/public-key'),
+    subscribePush: (subscription: PushSubscriptionInput) =>
+      request<void>('/push/subscriptions', { method: 'PUT', body: JSON.stringify(subscription) }),
+    unsubscribePush: (endpoint: string) =>
+      request<void>('/push/subscriptions', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   };
 }

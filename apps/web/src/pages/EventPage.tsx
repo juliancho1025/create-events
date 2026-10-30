@@ -1,19 +1,23 @@
 import {
+  isPast,
   useApi,
   useAttendees,
   useCancelRegistration,
   useCurrentUser,
   useDeleteEvent,
+  useDeleteReview,
   useEvent,
   useKickAttendee,
   useRegister,
+  useReviews,
+  useSaveReview,
   useSetMetric,
 } from '@events/shared';
-import { AttendeeList, ErrorText, EventDetails } from '@events/ui';
+import { AttendeeList, ErrorText, EventDetails, EventReviews } from '@events/ui';
 import { ArrowLeft, Lock, Pencil, Trash2 } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Button, Card, H4, Paragraph, XStack, YStack } from 'tamagui';
+import { Button, Card, H4, Paragraph, Separator, XStack, YStack } from 'tamagui';
 import { PageState } from '../components/PageState';
 
 export function EventPage() {
@@ -27,6 +31,9 @@ export function EventPage() {
   const remove = useDeleteEvent();
   const kick = useKickAttendee(id);
   const setMetric = useSetMetric(id);
+  const reviews = useReviews(id);
+  const saveReview = useSaveReview(id);
+  const deleteReview = useDeleteReview(id);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Attendee list is only visible to admins and people signed up (confirmed or waitlisted).
@@ -63,6 +70,8 @@ export function EventPage() {
   );
 
   const mutationError = register.error ?? cancel.error ?? remove.error ?? kick.error ?? setMetric.error;
+  // Mirrors the API rule: confirmed attendees, once the event has started.
+  const canReview = event.myStatus === 'CONFIRMED' && isPast(event);
 
   return (
     <YStack gap="$5">
@@ -81,6 +90,24 @@ export function EventPage() {
             actions={adminActions}
           />
           {mutationError && <ErrorText>{mutationError.message}</ErrorText>}
+
+          <Separator my="$5" />
+          {reviews.data ? (
+            <EventReviews
+              reviews={reviews.data}
+              currentUserId={user?.id}
+              onSave={canReview ? (input) => saveReview.mutate(input) : undefined}
+              savePending={saveReview.isPending}
+              onDelete={(userId) => deleteReview.mutate(userId === user?.id ? undefined : userId)}
+              deletePending={deleteReview.isPending}
+              canModerate={isAdmin}
+            />
+          ) : (
+            <PageState loading={reviews.isPending} error={reviews.error} />
+          )}
+          {(saveReview.error ?? deleteReview.error) && (
+            <ErrorText>{(saveReview.error ?? deleteReview.error)!.message}</ErrorText>
+          )}
         </YStack>
 
         <Card flex={1} flexBasis={280} minW={260} maxW={420} p="$4" gap="$3" borderWidth={1} borderColor="$borderColor">

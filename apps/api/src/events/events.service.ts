@@ -5,7 +5,9 @@ import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { metricKey } from '../metrics/metric-key.js';
 import { MetricsService } from '../metrics/metrics.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { RegistrationsService, type EventRegistrationStats } from '../registrations/registrations.service.js';
+import { ReviewsService } from '../reviews/reviews.service.js';
 import { StorageService, type StoredObject } from '../storage/storage.service.js';
 import { CreateEventDto, EventDto, UpdateEventDto } from './dto/event.dto.js';
 import { Event, EventDocument, type EventMetric } from './event.schema.js';
@@ -20,6 +22,8 @@ export class EventsService {
     @InjectModel(Event.name) private readonly eventModel: Model<Event>,
     private readonly registrations: RegistrationsService,
     private readonly metrics: MetricsService,
+    private readonly reviews: ReviewsService,
+    private readonly notifications: NotificationsService,
     private readonly storage: StorageService,
   ) {}
 
@@ -44,14 +48,16 @@ export class EventsService {
   async create(dto: CreateEventDto, image: Express.Multer.File, adminId: string): Promise<EventDto> {
     const _id = new Types.ObjectId();
     const imageKey = await this.uploadImage(_id, image);
+    const { notifications, ...fields } = dto;
     const event = await this.eventModel.create({
-      ...dto,
+      ...fields,
       metrics: toMetrics(dto.metrics ?? []),
       _id,
       imageKey,
       imageContentType: image.mimetype,
       createdBy: new Types.ObjectId(adminId),
     });
+    if (notifications?.length) await this.notifications.replacePending(event._id, event.startsAt, notifications);
     return this.get(event.id, adminId);
   }
 
@@ -62,7 +68,7 @@ export class EventsService {
     adminId: string,
   ): Promise<EventDto> {
     const event = await this.findOrThrow(id);
-    const { metrics, ...fields } = dto;
+    const { metrics, notifications, ...fields } = dto;
     const update: Partial<Event> = { ...fields };
     if (metrics) update.metrics = toMetrics(metrics);
     if (image) {
@@ -88,6 +94,9 @@ export class EventsService {
       const removed = event.metrics.map((m) => m.key).filter((key) => !kept.has(key));
       if (removed.length) await this.metrics.deleteForEvent(event._id, removed);
     }
+    const startsAt = dto.startsAt ?? event.startsAt;
+    if (notifications) await this.notifications.replacePending(event._id, startsAt, notifications);
+    else if (dto.startsAt) await this.notifications.reschedule(event._id, startsAt);
     if (dto.capacity !== undefined && dto.capacity > event.capacity) {
       await this.registrations.fillOpenSeats(event._id);
     }
@@ -98,6 +107,8 @@ export class EventsService {
     const event = await this.findOrThrow(id);
     await this.registrations.deleteForEvent(event._id);
     await this.metrics.deleteForEvent(event._id);
+    await this.reviews.deleteForEvent(event._id);
+    await this.notifications.deleteForEvent(event._id);
     await event.deleteOne();
     await this.deleteImageQuietly(event.imageKey);
   }

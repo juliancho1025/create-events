@@ -1,8 +1,9 @@
 import { useApiContext, useCurrentUser } from '@events/shared';
 import { initials } from '@events/ui';
-import { BarChart3, CalendarDays, LogOut } from '@tamagui/lucide-icons-2';
+import { BarChart3, Bell, BellOff, CalendarDays, LogOut } from '@tamagui/lucide-icons-2';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { Avatar, Button, Text, XStack, YStack } from 'tamagui';
+import { unsubscribe, usePushNotifications } from '../push';
 import { PageState } from './PageState';
 
 /** Route guard: sends anonymous users to /login, remembering where they were going. */
@@ -23,7 +24,7 @@ export function RequireAdmin() {
 
 export function Layout() {
   const { user, isAdmin } = useCurrentUser();
-  const { signOut } = useApiContext();
+  const { api, signOut } = useApiContext();
   const navigate = useNavigate();
 
   return (
@@ -50,6 +51,7 @@ export function Layout() {
         </Link>
         {user && (
           <XStack gap="$3" items="center">
+            <PushToggle />
             {isAdmin && (
               <Button size="$3" chromeless icon={<BarChart3 size={16} />} onPress={() => navigate('/metrics')}>
                 Metrics
@@ -71,7 +73,13 @@ export function Layout() {
                 {isAdmin ? 'Admin' : 'Member'}
               </Text>
             </YStack>
-            <Button size="$3" chromeless icon={<LogOut size={16} />} onPress={() => void signOut()} aria-label="Log out" />
+            <Button
+              size="$3"
+              chromeless
+              icon={<LogOut size={16} />}
+              onPress={() => void unsubscribe(api).finally(signOut)}
+              aria-label="Log out"
+            />
           </XStack>
         )}
       </XStack>
@@ -79,5 +87,31 @@ export function Layout() {
         <Outlet />
       </YStack>
     </YStack>
+  );
+}
+
+const PUSH_HINTS: Record<string, string> = {
+  denied: 'Notifications are blocked for this site in your browser settings',
+  unavailable: 'Push notifications are not configured on the server',
+};
+
+/** Bell in the header: turns this browser's push notifications on or off. Hidden where push can't work. */
+function PushToggle() {
+  const { state, pending, error, enable, disable } = usePushNotifications();
+  if (state === null || state === 'unsupported') return null;
+  const on = state === 'on';
+  const blocked = state === 'denied' || state === 'unavailable';
+  const label = error?.message ?? PUSH_HINTS[state] ?? (on ? 'Turn off notifications' : 'Turn on notifications');
+  return (
+    <Button
+      size="$3"
+      chromeless
+      icon={on ? <Bell size={16} color="$accent10" /> : <BellOff size={16} />}
+      disabled={pending || blocked}
+      opacity={blocked ? 0.5 : 1}
+      aria-label={label}
+      aria-pressed={on}
+      onPress={() => void (on ? disable() : enable())}
+    />
   );
 }

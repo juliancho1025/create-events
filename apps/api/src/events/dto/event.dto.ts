@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { plainToInstance, Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,8 +10,10 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { EventMetricDto } from '../../metrics/metrics.dto.js';
+import { NotificationInputDto } from '../../notifications/notifications.dto.js';
 import { RegistrationStatus } from '../../registrations/registration.schema.js';
 
 /** Multipart can't carry arrays of strings reliably, so `metrics` arrives as a JSON string. */
@@ -23,6 +25,14 @@ const parseJsonArray = ({ value }: { value: unknown }) => {
     return value; // fails @IsArray with a readable message
   }
 };
+
+/** Like parseJsonArray, then into DTO instances so @ValidateNested can check each item. */
+const parseJsonArrayOf =
+  <T>(cls: new () => T) =>
+  (params: { value: unknown }) => {
+    const parsed = parseJsonArray(params);
+    return Array.isArray(parsed) ? plainToInstance(cls, parsed) : parsed;
+  };
 
 /**
  * Sent as multipart/form-data together with an `image` file, so numbers and
@@ -70,6 +80,19 @@ export class CreateEventDto {
   @IsNotEmpty({ each: true })
   @MaxLength(40, { each: true })
   metrics?: string[];
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'JSON array of pushes to confirmed attendees, e.g. [{"minutesBefore":60,"message":"Starts in an hour"}]. ' +
+      'Replaces the pending ones; omit to leave them unchanged.',
+  })
+  @IsOptional()
+  @Transform(parseJsonArrayOf(NotificationInputDto))
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  notifications?: NotificationInputDto[];
 }
 
 export class UpdateEventDto extends PartialType(CreateEventDto) {}

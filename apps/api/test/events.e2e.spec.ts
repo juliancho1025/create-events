@@ -3,6 +3,8 @@ import { Test } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Readable } from 'node:stream';
 import request from 'supertest';
+import { NotificationsService } from '../src/notifications/notifications.service.js';
+import { PushSender, type PushTarget } from '../src/notifications/push.sender.js';
 import { setupApp } from '../src/setup-app.js';
 import { StorageService } from '../src/storage/storage.service.js';
 
@@ -27,10 +29,22 @@ class InMemoryStorage {
   }
 }
 
+class FakePushSender {
+  publicKey = 'test-vapid-key';
+  sent: { endpoint: string; payload: { title: string; body: string; url: string } }[] = [];
+  /** Endpoints the "push service" reports as expired. */
+  gone = new Set<string>();
+  async send(target: PushTarget, payload: string) {
+    if (this.gone.has(target.endpoint)) throw Object.assign(new Error('Gone'), { statusCode: 410 });
+    this.sent.push({ endpoint: target.endpoint, payload: JSON.parse(payload) });
+  }
+}
+
 describe('Events API (e2e)', () => {
   let mongo: MongoMemoryServer;
   let app: INestApplication;
   const storage = new InMemoryStorage();
+  const pushSender = new FakePushSender();
   const tokens: Record<string, string> = {};
   const userIds: Record<string, string> = {};
 
@@ -76,6 +90,8 @@ describe('Events API (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(StorageService)
       .useValue(storage)
+      .overrideProvider(PushSender)
+      .useValue(pushSender)
       .compile();
     app = moduleRef.createNestApplication();
     setupApp(app, 'http://localhost:5173');
@@ -302,6 +318,157 @@ describe('Events API (e2e)', () => {
       expect(stat('carol')).toEqual({ count: 1, opportunities: 1 });
       const row = report.events.find((e: { eventId: string }) => e.eventId === second);
       expect(row.stats['report-no-show']).toEqual({ count: 2, opportunities: 2 });
+    });
+  });
+
+  describe('reviews', () => {
+    const reviewUrl = (eventId: string, who = 'me') => `/api/events/${eventId}/reviews/${who}`;
+    // Sign up while upcoming, then move the event into the past.
+    const startedEvent = async (people: string[], capacity = '5') => {
+      const { body: event } = await createEvent({ capacity }).expect(201);
+      for (const p of people) await signUp(p, event.id).expect(201);
+      await http().patch(`/api/events/${event.id}`).set(as('admin'))
+        .field('startsAt', new Date(Date.now() - 3_600_000).toISOString()).expect(200);
+      return event.id as string;
+    };
+
+    it('lets confirmed attendees rate 0-5 stars once the event has started', async () => {
+      const { body: upcoming } = await createEvent().expect(201);
+      await signUp('alice', upcoming.id).expect(201);
+      await http().put(reviewUrl(upcoming.id)).set(as('alice')).send({ rating: 4 }).expect(400);
+
+      const id = await startedEvent(['alice', 'bob'], '1'); // bob is waitlisted
+      await http().put(reviewUrl(id)).set(as('bob')).send({ rating: 4 }).expect(403);
+      await http().put(reviewUrl(id)).set(as('carol')).send({ rating: 4 }).expect(403);
+      for (const rating of [-1, 6, 2.5, '3']) {
+        await http().put(reviewUrl(id)).set(as('alice')).send({ rating }).expect(400);
+      }
+
+      const zero = await http().put(reviewUrl(id)).set(as('alice')).send({ rating: 0 }).expect(200);
+      expect(zero.body).toMatchObject({ userId: userIds.alice, name: 'alice', rating: 0, comment: '' });
+    });
+
+    it('shows comments publicly, lets authors edit or delete, and lets admins moderate', async () => {
+      const id = await startedEvent(['alice', 'bob']);
+      await http().put(reviewUrl(id)).set(as('alice')).send({ rating: 5, comment: '  Great talks!  ' }).expect(200);
+      await http().put(reviewUrl(id)).set(as('bob')).send({ rating: 2, comment: 'Ran late' }).expect(200);
+
+      // Not signed up at all, still sees them.
+      const list = (await http().get(`/api/events/${id}/reviews`).set(as('carol')).expect(200)).body;
+      expect(list).toMatchObject({ average: 3.5, count: 2 });
+      expect(list.reviews.map((r: { comment: string }) => r.comment)).toEqual(['Ran late', 'Great talks!']);
+
+      // Writing again edits the one review.
+      await http().put(reviewUrl(id)).set(as('alice')).send({ rating: 4 }).expect(200);
+      const edited = (await http().get(`/api/events/${id}/reviews`).set(as('carol'))).body;
+      expect(edited).toMatchObject({ average: 3, count: 2 });
+      expect(edited.reviews[0]).toMatchObject({ userId: userIds.alice, rating: 4, comment: '' });
+
+      await http().delete(reviewUrl(id, userIds.alice)).set(as('bob')).expect(403);
+      await http().delete(reviewUrl(id, userIds.bob)).set(as('admin')).expect(204);
+      await http().delete(reviewUrl(id)).set(as('alice')).expect(204);
+      await http().delete(reviewUrl(id)).set(as('alice')).expect(404);
+      expect((await http().get(`/api/events/${id}/reviews`).set(as('carol'))).body)
+        .toEqual({ average: null, count: 0, reviews: [] });
+    });
+  });
+
+  describe('push notifications', () => {
+    const endpoint = (who: string) => `https://push.example/${who}`;
+    const subscribe = (who: string) =>
+      http().put('/api/push/subscriptions').set(as(who))
+        .send({ endpoint: endpoint(who), keys: { p256dh: 'p256dh-key', auth: 'auth-key' } });
+    const sentTo = (who: string) => pushSender.sent.filter((s) => s.endpoint === endpoint(who));
+    const dispatch = (at: number) => app.get(NotificationsService).dispatchDue(new Date(at));
+
+    beforeAll(async () => {
+      for (const who of ['alice', 'bob', 'carol']) await subscribe(who).expect(204);
+    });
+    beforeEach(() => {
+      pushSender.sent = [];
+    });
+
+    it('exposes the VAPID key and validates subscriptions', async () => {
+      const { body } = await http().get('/api/push/public-key').set(as('alice')).expect(200);
+      expect(body).toEqual({ publicKey: 'test-vapid-key' });
+      await http().put('/api/push/subscriptions').set(as('alice')).send({ endpoint: 'http://insecure', keys: { p256dh: 'a', auth: 'b' } }).expect(400);
+      await http().put('/api/push/subscriptions').set(as('alice')).send({ endpoint: endpoint('x') }).expect(400);
+    });
+
+    it('sends programmed notifications to confirmed attendees once, when due', async () => {
+      const startsAt = Date.now() + 2 * 86_400_000;
+      const { body: event } = await createEvent({
+        capacity: '1',
+        startsAt: new Date(startsAt).toISOString(),
+        notifications: JSON.stringify([
+          { minutesBefore: 1440, message: ' See you tomorrow! ' },
+          { minutesBefore: 60, message: 'Starts in an hour' },
+        ]),
+      }).expect(201);
+      await signUp('alice', event.id).expect(201);
+      await signUp('bob', event.id).expect(201); // waitlisted: not notified
+
+      await http().get(`/api/events/${event.id}/notifications`).set(as('alice')).expect(403);
+      const list = (await http().get(`/api/events/${event.id}/notifications`).set(as('admin')).expect(200)).body;
+      expect(list.map((n: { message: string; status: string }) => [n.message, n.status])).toEqual([
+        ['See you tomorrow!', 'PENDING'],
+        ['Starts in an hour', 'PENDING'],
+      ]);
+      expect(new Date(list[1].sendAt).getTime()).toBe(startsAt - 3_600_000);
+
+      expect(await dispatch(startsAt - 1441 * 60_000)).toBe(0);
+      expect(await dispatch(startsAt - 1440 * 60_000)).toBe(1);
+      expect(await dispatch(startsAt - 1440 * 60_000)).toBe(0); // never twice
+      expect(sentTo('alice').map((s) => s.payload)).toEqual([
+        { title: 'Java Meetup', body: 'See you tomorrow!', url: `/events/${event.id}` },
+      ]);
+      expect(sentTo('bob')).toEqual([]);
+
+      const after = (await http().get(`/api/events/${event.id}/notifications`).set(as('admin'))).body;
+      expect(after[0]).toMatchObject({ status: 'SENT', deliveredTo: 1 });
+    });
+
+    it('moves pending notifications with the event and replaces only the pending ones', async () => {
+      const startsAt = Date.now() + 2 * 86_400_000;
+      const { body: event } = await createEvent({
+        startsAt: new Date(startsAt).toISOString(),
+        notifications: '[{"minutesBefore":2000,"message":"Early"},{"minutesBefore":30,"message":"Soon"}]',
+      }).expect(201);
+      await dispatch(startsAt - 2000 * 60_000); // "Early" goes out
+
+      const moved = startsAt + 86_400_000;
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('startsAt', new Date(moved).toISOString()).expect(200);
+      let list = (await http().get(`/api/events/${event.id}/notifications`).set(as('admin'))).body;
+      expect(new Date(list.find((n: { message: string }) => n.message === 'Soon').sendAt).getTime()).toBe(moved - 30 * 60_000);
+
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('notifications', '[{"minutesBefore":0,"message":"Starting now"}]').expect(200);
+      list = (await http().get(`/api/events/${event.id}/notifications`).set(as('admin'))).body;
+      expect(list.map((n: { message: string }) => n.message)).toEqual(['Early', 'Starting now']);
+
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('notifications', '[{"minutesBefore":-1,"message":"x"}]').expect(400);
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('notifications', '[{"minutesBefore":5,"message":"  "}]').expect(400);
+      await http().patch(`/api/events/${event.id}`).set(as('admin')).field('notifications', '[{"minutesBefore":5,"message":"x","extra":1}]').expect(400);
+    });
+
+    it('notifies whoever gets promoted off the waitlist, and drops expired subscriptions', async () => {
+      const { body: event } = await createEvent({ capacity: '1' }).expect(201);
+      const leave = (who: string) => http().delete(`/api/events/${event.id}/registrations/me`).set(as(who)).expect(204);
+      await signUp('alice', event.id).expect(201);
+      await signUp('bob', event.id).expect(201); // waitlisted
+      await leave('alice');
+      expect(sentTo('bob').map((s) => s.payload.body)).toEqual([expect.stringMatching(/off the waitlist/)]);
+
+      // Carol's browser unsubscribed behind our back: the push service answers 410.
+      pushSender.gone.add(endpoint('carol'));
+      await signUp('carol', event.id).expect(201);
+      await leave('bob'); // promotes carol, whose subscription gets dropped
+      pushSender.gone.delete(endpoint('carol'));
+      await signUp('bob', event.id).expect(201);
+      await leave('carol');
+      await signUp('carol', event.id).expect(201);
+      await leave('bob'); // promotes carol again: nothing left to send to
+      expect(sentTo('carol')).toEqual([]);
+      await subscribe('carol').expect(204);
     });
   });
 

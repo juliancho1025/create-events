@@ -1,4 +1,4 @@
-import { useApi, useEvent, useUpdateEvent } from '@events/shared';
+import { useApi, useEvent, useEventNotifications, useUpdateEvent } from '@events/shared';
 import { EventForm } from '@events/ui';
 import { useNavigate, useParams } from 'react-router';
 import { Card, H2, YStack } from 'tamagui';
@@ -11,8 +11,15 @@ export function EditEventPage() {
   const api = useApi();
   const { data: event, isPending, error } = useEvent(id);
   const update = useUpdateEvent(id);
+  // The form copies its initial values once, so wait for both.
+  const notifications = useEventNotifications(id, true);
 
   if (isPending || error) return <PageState loading={isPending} error={error} />;
+  if (!notifications.data) return <PageState loading={notifications.isPending} error={notifications.error} />;
+  const pick = (status: 'PENDING' | 'SENT') =>
+    notifications.data
+      .filter((n) => n.status === status)
+      .map(({ minutesBefore, message }) => ({ minutesBefore, message }));
 
   return (
     <YStack gap="$4" maxW={720} width="100%" mx="auto">
@@ -28,6 +35,8 @@ export function EditEventPage() {
             capacity: event.capacity,
             imageUri: api.resolveUrl(event.imageUrl),
             metrics: event.metrics.map((m) => m.label),
+            notifications: pick('PENDING'),
+            sentNotifications: pick('SENT'),
           }}
           DateTimeInput={WebDateTimeInput}
           ImageInput={WebImageInput}

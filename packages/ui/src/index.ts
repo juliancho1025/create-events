@@ -6,3 +6,5 @@ export * from './EventDetails';
 export * from './AttendeeList';
 export * from './EventForm';
 export * from './MetricsEditor';
+export * from './EventReviews';
+export * from './NotificationsEditor';

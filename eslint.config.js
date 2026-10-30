@@ -58,4 +58,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
     rules: reactHooks.configs.flat['recommended-latest'].rules,
   },
+
+  // Web Push service worker, served as-is (not bundled).
+  { files: ['apps/web/public/sw.js'], languageOptions: { globals: globals.serviceworker } },
 );

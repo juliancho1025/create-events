@@ -39,6 +39,12 @@ export const appConfig = registerAs('app', () => {
       secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? '',
       forcePathStyle: env.S3_FORCE_PATH_STYLE === 'true',
     },
+    /** Web Push is off unless both keys are set. */
+    vapid: {
+      publicKey: env.VAPID_PUBLIC_KEY ?? '',
+      privateKey: env.VAPID_PRIVATE_KEY ?? '',
+      subject: env.VAPID_SUBJECT ?? 'mailto:admin@example.com',
+    },
   };
 });
 

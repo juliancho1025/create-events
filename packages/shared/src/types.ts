@@ -52,6 +52,33 @@ export interface Attendees {
   waitlist: Attendee[];
 }
 
+export const MAX_RATING = 5;
+
+export interface Review {
+  userId: string;
+  name: string;
+  avatarUrl?: string;
+  /** Whole stars, 0 to MAX_RATING. */
+  rating: number;
+  /** Empty when the attendee left only stars. */
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Reviews {
+  /** Null when nobody has rated yet. */
+  average: number | null;
+  count: number;
+  /** Most recently written first. */
+  reviews: Review[];
+}
+
+export interface ReviewInput {
+  rating: number;
+  comment?: string;
+}
+
 export interface RegistrationResult {
   status: RegistrationStatus;
   waitlistPosition: number | null;
@@ -78,6 +105,33 @@ export interface EventInput {
   metrics: string[];
   /** Required on create, optional on update. */
   image?: UploadableImage;
+  /** Replaces the pending programmed notifications; omit to leave them unchanged. */
+  notifications?: NotificationInput[];
+}
+
+/** Max programmed notifications per event, and how far ahead of the start they can go. */
+export const MAX_NOTIFICATIONS = 5;
+export const MAX_MINUTES_BEFORE = 30 * 24 * 60;
+
+export interface NotificationInput {
+  /** 0 = when the event starts. */
+  minutesBefore: number;
+  message: string;
+}
+
+export interface ScheduledNotification extends NotificationInput {
+  id: string;
+  sendAt: string;
+  status: 'PENDING' | 'SENT';
+  sentAt?: string;
+  /** Devices it reached. */
+  deliveredTo?: number;
+}
+
+/** `PushSubscription.toJSON()` from the browser. */
+export interface PushSubscriptionInput {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
 }
 
 export interface MetricCount {

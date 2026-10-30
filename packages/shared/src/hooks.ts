@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi, useApiContext } from './auth';
-import type { Attendees, EventInput, EventScope } from './types';
+import type { Attendees, EventInput, EventScope, ReviewInput } from './types';
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -10,6 +10,8 @@ export const queryKeys = {
   event: (id: string) => ['events', 'detail', id] as const,
   attendees: (id: string) => ['events', 'attendees', id] as const,
   metricsReport: ['events', 'metrics-report'] as const,
+  reviews: (id: string) => ['events', 'reviews', id] as const,
+  notifications: (id: string) => ['events', 'notifications', id] as const,
 };
 
 /** Current user, or undefined while logged out. `isAdmin` drives admin-only UI. */
@@ -132,5 +134,39 @@ export function useSetMetric(eventId: string) {
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({ queryKey: queryKeys.metricsReport });
     },
+  });
+}
+
+/** Programmed notifications of an event (admins only). */
+export function useEventNotifications(eventId: string, enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.notifications(eventId),
+    queryFn: () => api.eventNotifications(eventId),
+    enabled,
+  });
+}
+
+export function useReviews(eventId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.reviews(eventId), queryFn: () => api.reviews(eventId) });
+}
+
+export function useSaveReview(eventId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReviewInput) => api.saveReview(eventId, input),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.reviews(eventId) }),
+  });
+}
+
+/** Without a userId deletes the caller's own review; with one, an admin moderates. */
+export function useDeleteReview(eventId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId?: string) => api.deleteReview(eventId, userId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.reviews(eventId) }),
   });
 }

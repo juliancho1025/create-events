@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,6 +12,7 @@ import { Role, type AuthUser } from '../common/roles.js';
 import { Event } from '../events/event.schema.js';
 import type { AttendeeDto, AttendeesDto, RegistrationDto } from '../events/dto/event.dto.js';
 import { MetricsService } from '../metrics/metrics.service.js';
+import { PushService } from '../notifications/push.service.js';
 import type { User } from '../users/user.schema.js';
 import { Registration, RegistrationDocument, RegistrationStatus } from './registration.schema.js';
 
@@ -29,10 +31,13 @@ export interface EventRegistrationStats {
  */
 @Injectable()
 export class RegistrationsService {
+  private readonly logger = new Logger(RegistrationsService.name);
+
   constructor(
     @InjectModel(Registration.name) private readonly registrationModel: Model<Registration>,
     @InjectModel(Event.name) private readonly eventModel: Model<Event>,
     private readonly metrics: MetricsService,
+    private readonly push: PushService,
   ) {}
 
   async register(eventId: string, userId: string): Promise<RegistrationDto> {
@@ -185,11 +190,29 @@ export class RegistrationsService {
   }
 
   private async promoteNextWaitlisted(eventId: Types.ObjectId): Promise<RegistrationDocument | null> {
-    return this.registrationModel.findOneAndUpdate(
+    const promoted = await this.registrationModel.findOneAndUpdate(
       { event: eventId, status: RegistrationStatus.WAITLISTED },
       { $set: { status: RegistrationStatus.CONFIRMED } },
       { sort: WAITLIST_ORDER, returnDocument: 'after' },
     );
+    if (promoted) await this.notifyPromoted(promoted);
+    return promoted;
+  }
+
+  /** Best effort: the seat is theirs whether or not the push gets through. */
+  private async notifyPromoted(registration: RegistrationDocument): Promise<void> {
+    try {
+      const event = await this.eventModel.findById(registration.event, { name: 1 });
+      if (!event) return;
+      await this.push.sendToUsers([registration.user], {
+        title: event.name,
+        body: "A seat opened up: you're off the waitlist and going!",
+        url: `/events/${event.id}`,
+        tag: `promoted-${event.id}`,
+      });
+    } catch (err) {
+      this.logger.warn(`Could not notify promoted user: ${(err as Error).message}`);
+    }
   }
 
   private async waitlistPosition(registration: RegistrationDocument): Promise<number> {
