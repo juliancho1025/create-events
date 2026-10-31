@@ -4,12 +4,35 @@ export type Role = 'ADMIN' | 'USER';
 export type RegistrationStatus = 'CONFIRMED' | 'WAITLISTED';
 export type EventScope = 'upcoming' | 'past' | 'all';
 
+export interface EmergencyContact {
+  name: string;
+  phone: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
+  /** Uploaded photo (relative to the API origin, like `EventItem.imageUrl`) or the Google picture. */
   avatarUrl?: string;
+  /** True when `avatarUrl` is a photo the user uploaded, so it can be removed. */
+  hasUploadedAvatar: boolean;
   role: Role;
+  username?: string;
+  phone?: string;
+  emergencyContact?: EmergencyContact;
+  allergies?: string;
+  /** False until the profile is saved once; signing up for events requires it. */
+  profileComplete: boolean;
+}
+
+/** Whole profile (PUT): leaving an optional field out clears it. */
+export interface ProfileInput {
+  name: string;
+  username: string;
+  phone?: string;
+  emergencyContact: EmergencyContact;
+  allergies?: string;
 }
 
 export interface EventItem {
@@ -41,8 +64,13 @@ export interface Attendee {
   userId: string;
   name: string;
   avatarUrl?: string;
-  email?: string;
+  username?: string;
   registeredAt: string;
+  // Admins only:
+  email?: string;
+  phone?: string;
+  emergencyContact?: EmergencyContact;
+  allergies?: string;
   /** Marked metric keys. Admins only. */
   metrics?: string[];
 }

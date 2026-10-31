@@ -58,6 +58,15 @@ describe('Events API (e2e)', () => {
     return res.body.user;
   };
 
+  const profile = (who: string, fields: Record<string, unknown> = {}) => ({
+    name: who,
+    username: who,
+    emergencyContact: { name: `${who}'s mom`, phone: '+1 555 010 2030' },
+    ...fields,
+  });
+  const saveProfile = (who: string, fields: Record<string, unknown> = {}) =>
+    http().put('/api/users/me').set(as(who)).send(profile(who, fields));
+
   const createEvent = (fields: Partial<Record<string, string>> = {}) => {
     const req = http().post('/api/events').set(as('admin'));
     const values = {
@@ -99,6 +108,7 @@ describe('Events API (e2e)', () => {
 
     await login('admin', 'admin@example.com');
     for (const name of ['alice', 'bob', 'carol', 'dave']) await login(name, `${name}@example.com`);
+    for (const who of ['admin', 'alice', 'bob', 'carol', 'dave']) await saveProfile(who).expect(200);
   });
 
   afterAll(async () => {
@@ -469,6 +479,112 @@ describe('Events API (e2e)', () => {
       await leave('bob'); // promotes carol again: nothing left to send to
       expect(sentTo('carol')).toEqual([]);
       await subscribe('carol').expect(204);
+    });
+  });
+
+  describe('profile', () => {
+    it('starts incomplete, blocks sign-ups until saved, and keeps the chosen name across logins', async () => {
+      const fresh = await login('erin', 'erin@example.com');
+      expect(fresh).toMatchObject({ name: 'erin', profileComplete: false });
+      const { body: event } = await createEvent().expect(201);
+      await signUp('erin', event.id).expect(400);
+
+      const { body: saved } = await saveProfile('erin', {
+        name: '  Erin Example ',
+        username: 'Erin.X',
+        phone: '+1 (555) 010-9999',
+        allergies: 'Peanuts',
+      }).expect(200);
+      expect(saved).toMatchObject({
+        name: 'Erin Example',
+        username: 'erin.x',
+        phone: '+1 (555) 010-9999',
+        emergencyContact: { name: "erin's mom", phone: '+1 555 010 2030' },
+        allergies: 'Peanuts',
+        profileComplete: true,
+      });
+      await signUp('erin', event.id).expect(201);
+
+      // Logging in again (e.g. Google sends its own name) doesn't overwrite it.
+      expect((await login('erin', 'erin@example.com')).name).toBe('Erin Example');
+
+      // Optional fields are cleared when left out or blank.
+      const { body: trimmed } = await saveProfile('erin', { name: 'Erin', username: 'erin.x', phone: ' ' }).expect(200);
+      expect(trimmed.phone).toBeUndefined();
+      expect(trimmed.allergies).toBeUndefined();
+    });
+
+    it('validates fields and keeps usernames unique, case-insensitively', async () => {
+      await saveProfile('dave', { username: 'ALICE' }).expect(409);
+      for (const fields of [
+        { username: 'ab' },
+        { username: 'has space' },
+        { name: ' ' },
+        { phone: 'call me' },
+        { emergencyContact: undefined },
+        { emergencyContact: { name: 'Mom' } },
+        { emergencyContact: { name: 'Mom', phone: 'nope' } },
+        { allergies: 'x'.repeat(501) },
+        { role: 'ADMIN' },
+      ]) {
+        await saveProfile('dave', fields).expect(400);
+      }
+      // Values are stored as typed, never evaluated as field paths.
+      const { body } = await saveProfile('dave', { name: '$email' }).expect(200);
+      expect(body.name).toBe('$email');
+      await saveProfile('dave').expect(200);
+    });
+
+    it('uploads, serves, replaces and removes a profile photo shown everywhere', async () => {
+      const upload = (who: string, body: Buffer, contentType = 'image/png') =>
+        http().put('/api/users/me/avatar').set(as(who)).attach('image', body, { filename: 'me.png', contentType });
+      const { body: event } = await createEvent().expect(201);
+      const before = storage.objects.size;
+
+      await upload('dave', Buffer.from('not an image'), 'image/png').expect(400);
+      await http().put('/api/users/me/avatar').set(as('dave')).expect(400); // no file
+      const { body: me } = await upload('dave', PNG).expect(200);
+      expect(me.hasUploadedAvatar).toBe(true);
+      expect(me.avatarUrl).toMatch(new RegExp(`^/api/users/${userIds.dave}/avatar\\?v=`));
+      expect(storage.objects.size).toBe(before + 1);
+
+      // Public (for <img>), and the same URL in attendee lists.
+      const img = await http().get(me.avatarUrl).expect(200);
+      expect(img.headers['content-type']).toBe('image/png');
+      await signUp('dave', event.id).expect(201);
+      const list = (await http().get(`/api/events/${event.id}/attendees`).set(as('dave'))).body;
+      expect(list.confirmed[0].avatarUrl).toBe(me.avatarUrl);
+
+      // Replacing gets a new URL and deletes the old file.
+      const { body: replaced } = await upload('dave', PNG).expect(200);
+      expect(replaced.avatarUrl).not.toBe(me.avatarUrl);
+      expect(storage.objects.size).toBe(before + 1);
+
+      const { body: removed } = await http().delete('/api/users/me/avatar').set(as('dave')).expect(200);
+      expect(removed).toMatchObject({ hasUploadedAvatar: false });
+      expect(removed.avatarUrl).toBeUndefined();
+      expect(storage.objects.size).toBe(before);
+      await http().get(`/api/users/${userIds.dave}/avatar`).expect(404);
+    });
+
+    it('shows usernames to attendees, and contact and allergy details only to admins', async () => {
+      await saveProfile('alice', { allergies: 'Shellfish', phone: '555 0101' }).expect(200);
+      const { body: event } = await createEvent().expect(201);
+      await signUp('alice', event.id).expect(201);
+      await signUp('bob', event.id).expect(201);
+
+      const forBob = (await http().get(`/api/events/${event.id}/attendees`).set(as('bob'))).body;
+      expect(forBob.confirmed[0]).toMatchObject({ name: 'alice', username: 'alice' });
+      for (const field of ['email', 'phone', 'emergencyContact', 'allergies']) {
+        expect(forBob.confirmed[0][field]).toBeUndefined();
+      }
+      const forAdmin = (await http().get(`/api/events/${event.id}/attendees`).set(as('admin'))).body;
+      expect(forAdmin.confirmed[0]).toMatchObject({
+        phone: '555 0101',
+        allergies: 'Shellfish',
+        emergencyContact: { name: "alice's mom", phone: '+1 555 010 2030' },
+      });
+      await saveProfile('alice').expect(200);
     });
   });
 

@@ -1,7 +1,7 @@
 import type { Attendee, Attendees, EventMetric } from '@events/shared';
 import { Check, UserX } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
-import { Avatar, Button, H5, Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
+import { Avatar, Button, H5, Paragraph, Separator, Text, Theme, XStack, YStack } from 'tamagui';
 
 interface KickProps {
   /** When set (admins only), each other attendee gets a "Remove" action. */
@@ -93,10 +93,27 @@ function Section({
                 {person.name}
                 {person.userId === currentUserId ? ' (you)' : ''}
               </Text>
-              {person.email && (
+              {(person.username || person.email) && (
                 <Text fontSize="$2" color="$color10">
-                  {person.email}
+                  {[person.username && `@${person.username}`, person.email].filter(Boolean).join(' · ')}
                 </Text>
+              )}
+              {person.phone && (
+                <Text fontSize="$2" color="$color10">
+                  {person.phone}
+                </Text>
+              )}
+              {person.emergencyContact && (
+                <Text fontSize="$2" color="$color10">
+                  Emergency: {person.emergencyContact.name}, {person.emergencyContact.phone}
+                </Text>
+              )}
+              {person.allergies && (
+                <Theme name="red">
+                  <Text fontSize="$2" color="$color10" fontWeight="600">
+                    Allergies: {person.allergies}
+                  </Text>
+                </Theme>
               )}
             </YStack>
             {onKick && person.userId !== currentUserId &&

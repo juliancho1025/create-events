@@ -13,7 +13,8 @@ import { Event } from '../events/event.schema.js';
 import type { AttendeeDto, AttendeesDto, RegistrationDto } from '../events/dto/event.dto.js';
 import { MetricsService } from '../metrics/metrics.service.js';
 import { PushService } from '../notifications/push.service.js';
-import type { User } from '../users/user.schema.js';
+import { AVATAR_FIELDS, avatarUrlOf } from '../users/avatar.js';
+import { User } from '../users/user.schema.js';
 import { Registration, RegistrationDocument, RegistrationStatus } from './registration.schema.js';
 
 const WAITLIST_ORDER = { createdAt: 1, _id: 1 } as const;
@@ -36,6 +37,7 @@ export class RegistrationsService {
   constructor(
     @InjectModel(Registration.name) private readonly registrationModel: Model<Registration>,
     @InjectModel(Event.name) private readonly eventModel: Model<Event>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly metrics: MetricsService,
     private readonly push: PushService,
   ) {}
@@ -45,6 +47,10 @@ export class RegistrationsService {
     if (!event) throw new NotFoundException('Event not found');
     if (event.startsAt.getTime() <= Date.now()) {
       throw new BadRequestException('This event has already started');
+    }
+    // Organizers rely on the emergency contact, so it must exist before anyone attends.
+    if (!(await this.userModel.exists({ _id: userId, profileCompletedAt: { $exists: true } }))) {
+      throw new BadRequestException('Complete your profile before signing up for events');
     }
     if (await this.registrationModel.exists({ event: event._id, user: userId })) {
       throw new ConflictException('You are already signed up for this event');
@@ -107,15 +113,27 @@ export class RegistrationsService {
       this.registrationModel
         .find({ event: eventId })
         .sort(WAITLIST_ORDER)
-        .populate<{ user: User & { _id: Types.ObjectId } }>('user', 'name avatarUrl email'),
+        .populate<{ user: User & { _id: Types.ObjectId } }>(
+          'user',
+          `name username ${AVATAR_FIELDS} ` + (isAdmin ? 'email phone emergencyContact allergies' : ''),
+        ),
       isAdmin ? this.metrics.marksByUser(eventId) : null,
     ]);
 
     const toDto = (r: (typeof registrations)[number]): AttendeeDto => ({
       userId: r.user._id.toString(),
       name: r.user.name,
-      avatarUrl: r.user.avatarUrl,
-      ...(isAdmin && { email: r.user.email }),
+      avatarUrl: avatarUrlOf(r.user),
+      username: r.user.username,
+      ...(isAdmin && {
+        email: r.user.email,
+        phone: r.user.phone,
+        emergencyContact: r.user.emergencyContact && {
+          name: r.user.emergencyContact.name,
+          phone: r.user.emergencyContact.phone,
+        },
+        allergies: r.user.allergies,
+      }),
       registeredAt: r.createdAt.toISOString(),
       ...(marks && { metrics: marks.get(r.user._id.toString()) ?? [] }),
     });

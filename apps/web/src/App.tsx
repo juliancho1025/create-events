@@ -12,6 +12,7 @@ import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
 import { MetricsPage } from './pages/MetricsPage';
 import { NewEventPage } from './pages/NewEventPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { localTokenStorage } from './tokenStorage';
 
 const queryClient = new QueryClient({
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <EventsPage /> },
           { path: 'events/:id', element: <EventPage /> },
+          { path: 'profile', element: <ProfilePage /> },
           {
             element: <RequireAdmin />,
             children: [

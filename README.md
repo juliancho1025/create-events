@@ -117,3 +117,11 @@ Admins program notifications in the event form as "N minutes/hours/days before";
 to the start, so moving the event moves them. A 30 s poller claims each due one with an atomic
 `PENDING -> SENT` update (sent once, even with several API instances) and pushes it to confirmed attendees.
 Someone promoted off the waitlist also gets a push.
+
+**Profiles.** After the first login, users are sent to `/profile` to pick a username (unique, case-insensitive)
+and an emergency contact; phone and allergies are optional. The API refuses event sign-ups until the profile
+is saved. Usernames are visible to fellow attendees; phone, emergency contact and allergies only to the user
+and to admins (in the attendee list). The login name only seeds a new account, so a name the user chose is
+never overwritten by Google's. Users can also upload a profile photo (same rules and storage as event
+images, served at `GET /api/users/:id/avatar`); it takes priority over the Google picture, and removing it
+falls back to that, or to initials.

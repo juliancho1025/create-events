@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { EventMetricDto } from '../../metrics/metrics.dto.js';
 import { NotificationInputDto } from '../../notifications/notifications.dto.js';
+import { EmergencyContactDto } from '../../users/user.dto.js';
 import { RegistrationStatus } from '../../registrations/registration.schema.js';
 
 /** Multipart can't carry arrays of strings reliably, so `metrics` arrives as a JSON string. */
@@ -118,7 +119,12 @@ export class AttendeeDto {
   @ApiProperty() userId: string;
   @ApiProperty() name: string;
   @ApiPropertyOptional() avatarUrl?: string;
+  @ApiPropertyOptional() username?: string;
   @ApiPropertyOptional({ description: 'Only included for admins' }) email?: string;
+  @ApiPropertyOptional({ description: 'Only included for admins' }) phone?: string;
+  @ApiPropertyOptional({ type: EmergencyContactDto, description: 'Only included for admins' })
+  emergencyContact?: EmergencyContactDto;
+  @ApiPropertyOptional({ description: 'Only included for admins' }) allergies?: string;
   @ApiProperty({ type: String, format: 'date-time' }) registeredAt: string;
   @ApiPropertyOptional({ type: [String], description: 'Marked metric keys; only included for admins' })
   metrics?: string[];

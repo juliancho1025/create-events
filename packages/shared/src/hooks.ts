@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi, useApiContext } from './auth';
-import type { Attendees, EventInput, EventScope, ReviewInput } from './types';
+import type { Attendees, EventInput, EventScope, ProfileInput, ReviewInput, UploadableImage, User } from './types';
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -24,6 +24,33 @@ export function useCurrentUser() {
     isAdmin: !!token && query.data?.role === 'ADMIN',
     isLoading: !ready || (!!token && query.isPending),
   };
+}
+
+/** Puts the returned user in the cache; names and photos also show up in attendee lists and reviews. */
+function useOnUserUpdated() {
+  const queryClient = useQueryClient();
+  return (user: User) => {
+    queryClient.setQueryData<User>(queryKeys.me, user);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+  };
+}
+
+export function useUpdateProfile() {
+  const api = useApi();
+  const onSuccess = useOnUserUpdated();
+  return useMutation({ mutationFn: (input: ProfileInput) => api.updateProfile(input), onSuccess });
+}
+
+export function useUploadAvatar() {
+  const api = useApi();
+  const onSuccess = useOnUserUpdated();
+  return useMutation({ mutationFn: (image: UploadableImage) => api.uploadAvatar(image), onSuccess });
+}
+
+export function useRemoveAvatar() {
+  const api = useApi();
+  const onSuccess = useOnUserUpdated();
+  return useMutation({ mutationFn: () => api.removeAvatar(), onSuccess });
 }
 
 export function useAuthProviders() {

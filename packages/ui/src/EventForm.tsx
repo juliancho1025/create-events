@@ -180,7 +180,7 @@ export function EventForm({
   );
 }
 
-function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+export function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
   return (
     <YStack gap="$1.5">
       <Label htmlFor={id} lineHeight="$1">

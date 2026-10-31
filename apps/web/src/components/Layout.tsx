@@ -6,14 +6,20 @@ import { Avatar, Button, Text, XStack, YStack } from 'tamagui';
 import { unsubscribe, usePushNotifications } from '../push';
 import { PageState } from './PageState';
 
-/** Route guard: sends anonymous users to /login, remembering where they were going. */
+/**
+ * Route guard: sends anonymous users to /login and new users to /profile to
+ * finish onboarding, remembering where they were going.
+ */
 export function RequireAuth() {
   const { token, ready } = useApiContext();
-  const { isLoading, error } = useCurrentUser();
+  const { user, isLoading, error } = useCurrentUser();
   const location = useLocation();
 
   if (ready && !token) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (isLoading || error) return <PageState loading={isLoading} error={error} />;
+  if (user && !user.profileComplete && location.pathname !== '/profile') {
+    return <Navigate to="/profile" replace state={{ from: location.pathname }} />;
+  }
   return <Outlet />;
 }
 
@@ -57,22 +63,27 @@ export function Layout() {
                 Metrics
               </Button>
             )}
-            <Avatar circular size="$3">
-              {user.avatarUrl && <Avatar.Image src={user.avatarUrl} />}
-              <Avatar.Fallback bg="$color5" items="center" justify="center">
-                <Text fontSize="$2" fontWeight="600">
-                  {initials(user.name)}
-                </Text>
-              </Avatar.Fallback>
-            </Avatar>
-            <YStack display="none" $sm={{ display: 'flex' }}>
-              <Text fontSize="$3" fontWeight="600">
-                {user.name}
-              </Text>
-              <Text fontSize="$1" color="$color10">
-                {isAdmin ? 'Admin' : 'Member'}
-              </Text>
-            </YStack>
+            <Link to="/profile" aria-label="Your profile" style={{ textDecoration: 'none' }}>
+              <XStack gap="$3" items="center">
+                <Avatar circular size="$3">
+                  {user.avatarUrl && <Avatar.Image src={api.resolveUrl(user.avatarUrl)} />}
+                  <Avatar.Fallback bg="$color5" items="center" justify="center">
+                    <Text fontSize="$2" fontWeight="600">
+                      {initials(user.name)}
+                    </Text>
+                  </Avatar.Fallback>
+                </Avatar>
+                <YStack display="none" $sm={{ display: 'flex' }}>
+                  <Text fontSize="$3" fontWeight="600">
+                    {user.name}
+                  </Text>
+                  <Text fontSize="$1" color="$color10">
+                    {user.username ? `@${user.username}` : isAdmin ? 'Admin' : 'Member'}
+                    {user.username && isAdmin ? ' · Admin' : ''}
+                  </Text>
+                </YStack>
+              </XStack>
+            </Link>
             <Button
               size="$3"
               chromeless

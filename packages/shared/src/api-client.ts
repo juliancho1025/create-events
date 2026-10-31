@@ -5,12 +5,14 @@ import type {
   EventItem,
   EventScope,
   MetricsReport,
+  ProfileInput,
   PushSubscriptionInput,
   RegistrationResult,
   Review,
   ReviewInput,
   Reviews,
   ScheduledNotification,
+  UploadableImage,
   User,
 } from './types';
 
@@ -78,6 +80,14 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
         body: JSON.stringify({ email, name }),
       }),
     me: () => request<User>('/users/me'),
+    updateProfile: (input: ProfileInput) =>
+      request<User>('/users/me', { method: 'PUT', body: JSON.stringify(input) }),
+    uploadAvatar: (image: UploadableImage) => {
+      const form = new FormData();
+      form.append('image', image as Blob); // RN's { uri, name, type } works too, see toFormData
+      return request<User>('/users/me/avatar', { method: 'PUT', body: form });
+    },
+    removeAvatar: () => request<User>('/users/me/avatar', { method: 'DELETE' }),
 
     listEvents: (scope: EventScope = 'upcoming') => request<EventItem[]>(`/events?scope=${scope}`),
     getEvent: (id: string) => request<EventItem>(`/events/${id}`),
