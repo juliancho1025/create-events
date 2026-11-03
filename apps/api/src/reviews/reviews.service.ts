@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Event } from '../events/event.schema.js';
 import { Registration, RegistrationStatus } from '../registrations/registration.schema.js';
+import { AVATAR_FIELDS, avatarUrlOf } from '../users/avatar.js';
 import type { User } from '../users/user.schema.js';
 import { Review } from './review.schema.js';
 import type { ReviewDto, ReviewsDto, UpsertReviewDto } from './reviews.dto.js';
@@ -44,14 +45,14 @@ export class ReviewsService {
     const reviews = await this.reviewModel
       .find({ event: eventId, ...(onlyUserId && { user: onlyUserId }) })
       .sort({ updatedAt: -1, _id: -1 })
-      .populate<{ user: (User & { _id: Types.ObjectId }) | null }>('user', 'name avatarUrl');
+      .populate<{ user: (User & { _id: Types.ObjectId }) | null }>('user', `name ${AVATAR_FIELDS}`);
 
     const dtos: ReviewDto[] = reviews
       .filter((r) => r.user) // skip reviews of users that no longer exist
       .map((r) => ({
         userId: r.user!._id.toString(),
         name: r.user!.name,
-        avatarUrl: r.user!.avatarUrl,
+        avatarUrl: avatarUrlOf(r.user!),
         rating: r.rating,
         comment: r.comment,
         createdAt: r.createdAt.toISOString(),

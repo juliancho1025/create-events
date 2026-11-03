@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Event } from '../events/event.schema.js';
 import { Registration, RegistrationStatus } from '../registrations/registration.schema.js';
+import { avatarUrlOf } from '../users/avatar.js';
 import { User } from '../users/user.schema.js';
 import { MetricMark } from './metric-mark.schema.js';
 import type { EventMetricDto, MetricCountDto, MetricsReportDto } from './metrics.dto.js';
@@ -111,7 +112,7 @@ export class MetricsService {
 
     const users = await this.userModel.find(
       { _id: { $in: [...userStats.keys()] } },
-      { name: 1, email: 1, avatarUrl: 1 },
+      { name: 1, email: 1, avatarUrl: 1, avatarKey: 1 },
     );
     const metrics: EventMetricDto[] = [...metricLabels].map(([key, label]) => ({ key, label }));
     return {
@@ -120,7 +121,7 @@ export class MetricsService {
         userId: u.id,
         name: u.name,
         email: u.email,
-        avatarUrl: u.avatarUrl,
+        avatarUrl: avatarUrlOf(u),
         stats: userStats.get(u.id)!,
       })),
       events: eventRows,

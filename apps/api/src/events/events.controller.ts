@@ -2,10 +2,8 @@ import {
   Body,
   Controller,
   Delete,
-  FileTypeValidator,
   Get,
   HttpCode,
-  MaxFileSizeValidator,
   Param,
   ParseEnumPipe,
   ParseFilePipe,
@@ -32,19 +30,11 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser, Public, Roles } from '../common/decorators.js';
+import { imageValidators, MAX_IMAGE_BYTES } from '../common/images.js';
 import { ParseObjectIdPipe } from '../common/parse-object-id.pipe.js';
 import { Role, type AuthUser } from '../common/roles.js';
 import { CreateEventDto, EventDto, UpdateEventDto } from './dto/event.dto.js';
 import { EventsService, type EventScope } from './events.service.js';
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const IMAGE_TYPES = /^image\/(jpeg|png|webp|gif)$/;
-
-const imageValidators = [
-  new MaxFileSizeValidator({ maxSize: MAX_IMAGE_BYTES, message: 'Image must be 5 MB or smaller' }),
-  // Checks the file's magic bytes, not just the client-supplied Content-Type.
-  new FileTypeValidator({ fileType: IMAGE_TYPES }),
-];
 
 /** OpenAPI shape of the multipart body (fields + binary image). */
 const multipartSchema = (imageRequired: boolean) => ({

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type QueryFilter } from 'mongoose';
 import { randomUUID } from 'node:crypto';
-import { extname } from 'node:path';
+import { imageExtension } from '../common/images.js';
 import { metricKey } from '../metrics/metric-key.js';
 import { MetricsService } from '../metrics/metrics.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -125,7 +125,7 @@ export class EventsService {
   }
 
   private async uploadImage(eventId: Types.ObjectId, image: Express.Multer.File): Promise<string> {
-    const key = `events/${eventId.toHexString()}/${randomUUID()}${extname(image.originalname).toLowerCase()}`;
+    const key = `events/${eventId.toHexString()}/${randomUUID()}${imageExtension(image)}`;
     await this.storage.put(key, image.buffer, image.mimetype);
     return key;
   }
