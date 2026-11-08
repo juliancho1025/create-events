@@ -9,8 +9,10 @@ export default defineConfig({
     tamaguiPlugin(),
   ],
   server: {
+    // Listen on all interfaces so devices on the same network can open the app.
+    host: true,
     port: 5173,
     // Same-origin API calls in dev: no CORS, and the web client can use baseUrl ''.
-    proxy: { '/api': 'http://localhost:3000' },
+    proxy: { '/api': 'http://0.0.0.0:3000' },
   },
 });
