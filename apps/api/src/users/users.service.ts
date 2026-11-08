@@ -4,6 +4,7 @@ import { Model, type PipelineStage } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { imageExtension } from '../common/images.js';
 import { appConfig, type AppConfig } from '../config/app-config.js';
+import { InvitationsService } from '../invitations/invitations.service.js';
 import { StorageService, type StoredObject } from '../storage/storage.service.js';
 import { Role } from '../common/roles.js';
 import type { UpdateProfileDto } from './user.dto.js';
@@ -24,6 +25,7 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     private readonly storage: StorageService,
+    private readonly invitations: InvitationsService,
   ) {}
 
   /**
@@ -66,10 +68,20 @@ export class UsersService {
         updatePipeline: true,
       });
       if (!user) throw new NotFoundException('User not found');
+      await this.acceptInvitationsQuietly(user);
       return user;
     } catch (err) {
       if ((err as { code?: number }).code === 11000) throw new ConflictException('That username is taken');
       throw err;
+    }
+  }
+
+  /** With a saved profile the user can now be signed up for events they were invited to. */
+  private async acceptInvitationsQuietly(user: UserDocument) {
+    try {
+      await this.invitations.acceptPending(user);
+    } catch (err) {
+      this.logger.warn(`Could not accept invitations for ${user.id}: ${(err as Error).message}`);
     }
   }
 

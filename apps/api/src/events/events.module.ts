@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Invitation, InvitationSchema } from '../invitations/invitation.schema.js';
+import { InvitationsController } from '../invitations/invitations.controller.js';
+import { InvitationsService } from '../invitations/invitations.service.js';
+import { MailSender } from '../mail/mail.sender.js';
 import { MetricMark, MetricMarkSchema } from '../metrics/metric-mark.schema.js';
 import { MetricsController } from '../metrics/metrics.controller.js';
 import { MetricsService } from '../metrics/metrics.service.js';
@@ -25,7 +29,7 @@ import { Event, EventSchema } from './event.schema.js';
 import { EventsController } from './events.controller.js';
 import { EventsService } from './events.service.js';
 
-/** Events, registrations, metrics, reviews and notifications share one module: their consistency rules are intertwined. */
+/** Events, registrations, invitations, metrics, reviews and notifications share one module: their consistency rules are intertwined. */
 @Module({
   imports: [
     StorageModule,
@@ -37,9 +41,10 @@ import { EventsService } from './events.service.js';
       { name: ScheduledNotification.name, schema: ScheduledNotificationSchema },
       { name: PushSubscription.name, schema: PushSubscriptionSchema },
       { name: User.name, schema: UserSchema },
+      { name: Invitation.name, schema: InvitationSchema },
     ]),
   ],
-  controllers: [EventsController, RegistrationsController, MetricsController, ReviewsController, NotificationsController, PushController],
+  controllers: [EventsController, RegistrationsController, MetricsController, ReviewsController, NotificationsController, PushController, InvitationsController],
   providers: [
     EventsService,
     RegistrationsService,
@@ -48,6 +53,10 @@ import { EventsService } from './events.service.js';
     NotificationsService,
     PushService,
     PushSender,
+    InvitationsService,
+    MailSender,
   ],
+  // Users accept pending invitations when they save their profile.
+  exports: [InvitationsService],
 })
 export class EventsModule {}

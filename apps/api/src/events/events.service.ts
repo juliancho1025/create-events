@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type QueryFilter } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { imageExtension } from '../common/images.js';
+import { InvitationsService } from '../invitations/invitations.service.js';
 import { metricKey } from '../metrics/metric-key.js';
 import { MetricsService } from '../metrics/metrics.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -24,6 +25,7 @@ export class EventsService {
     private readonly metrics: MetricsService,
     private readonly reviews: ReviewsService,
     private readonly notifications: NotificationsService,
+    private readonly invitations: InvitationsService,
     private readonly storage: StorageService,
   ) {}
 
@@ -36,13 +38,13 @@ export class EventsService {
       .sort({ startsAt: scope === 'past' ? -1 : 1 })
       .limit(200);
     const stats = await this.registrations.statsFor(events.map((e) => e._id), userId);
-    return events.map((e) => this.toDto(e, stats.get(e.id)!));
+    return events.map((e) => this.toDto(e, stats.get(e.id)!, userId));
   }
 
   async get(id: string, userId: string): Promise<EventDto> {
     const event = await this.findOrThrow(id);
     const stats = await this.registrations.statsFor([event._id], userId);
-    return this.toDto(event, stats.get(event.id)!);
+    return this.toDto(event, stats.get(event.id)!, userId);
   }
 
   async create(dto: CreateEventDto, image: Express.Multer.File, adminId: string): Promise<EventDto> {
@@ -109,6 +111,7 @@ export class EventsService {
     await this.metrics.deleteForEvent(event._id);
     await this.reviews.deleteForEvent(event._id);
     await this.notifications.deleteForEvent(event._id);
+    await this.invitations.deleteForEvent(event._id);
     await event.deleteOne();
     await this.deleteImageQuietly(event.imageKey);
   }
@@ -138,7 +141,7 @@ export class EventsService {
     }
   }
 
-  private toDto(event: EventDocument, stats: EventRegistrationStats): EventDto {
+  private toDto(event: EventDocument, stats: EventRegistrationStats, userId: string): EventDto {
     // The image key changes whenever the image is replaced, so it doubles as a cache-buster.
     const version = event.imageKey.split('/').pop()!;
     return {
@@ -151,6 +154,7 @@ export class EventsService {
       capacity: event.capacity,
       confirmedCount: event.confirmedCount,
       metrics: event.metrics.map(({ key, label }) => ({ key, label })),
+      isCreator: event.createdBy.equals(userId),
       ...stats,
     };
   }

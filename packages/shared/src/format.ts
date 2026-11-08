@@ -21,3 +21,17 @@ export function availabilityLabel(event: EventItem): string {
   if (left > 0) return `${left} of ${event.capacity} seats left`;
   return event.waitlistCount > 0 ? `Full · ${event.waitlistCount} on waitlist` : 'Full · waitlist open';
 }
+
+/**
+ * Splits what the creator typed ("ada@x.com, @bob carol") into emails and usernames.
+ * Anything with an "@" after the first character is an email; a leading "@" marks a username.
+ */
+export function parsePeople(text: string): { emails: string[]; usernames: string[] } {
+  const emails: string[] = [];
+  const usernames: string[] = [];
+  for (const token of text.split(/[\s,;]+/).filter(Boolean)) {
+    if (token.indexOf('@', 1) > 0) emails.push(token.toLowerCase());
+    else usernames.push(token.replace(/^@/, '').toLowerCase());
+  }
+  return { emails: [...new Set(emails)], usernames: [...new Set(usernames.filter(Boolean))] };
+}

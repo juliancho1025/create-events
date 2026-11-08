@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Readable } from 'node:stream';
 import request from 'supertest';
+import { MailSender, type Mail } from '../src/mail/mail.sender.js';
 import { NotificationsService } from '../src/notifications/notifications.service.js';
 import { PushSender, type PushTarget } from '../src/notifications/push.sender.js';
 import { setupApp } from '../src/setup-app.js';
@@ -40,11 +41,19 @@ class FakePushSender {
   }
 }
 
+class FakeMailSender {
+  sent: Mail[] = [];
+  async send(mail: Mail) {
+    this.sent.push(mail);
+  }
+}
+
 describe('Events API (e2e)', () => {
   let mongo: MongoMemoryServer;
   let app: INestApplication;
   const storage = new InMemoryStorage();
   const pushSender = new FakePushSender();
+  const mailSender = new FakeMailSender();
   const tokens: Record<string, string> = {};
   const userIds: Record<string, string> = {};
 
@@ -89,7 +98,7 @@ describe('Events API (e2e)', () => {
     Object.assign(process.env, {
       MONGO_URI: mongo.getUri('events-test'),
       JWT_SECRET: 'test-secret',
-      ADMIN_EMAILS: 'admin@example.com',
+      ADMIN_EMAILS: 'admin@example.com,admin2@example.com',
       DEV_LOGIN_ENABLED: 'true',
       S3_BUCKET: 'test',
       GOOGLE_CLIENT_ID: '',
@@ -101,6 +110,8 @@ describe('Events API (e2e)', () => {
       .useValue(storage)
       .overrideProvider(PushSender)
       .useValue(pushSender)
+      .overrideProvider(MailSender)
+      .useValue(mailSender)
       .compile();
     app = moduleRef.createNestApplication();
     setupApp(app, 'http://localhost:5173');
@@ -610,6 +621,87 @@ describe('Events API (e2e)', () => {
     await http().delete(`/api/events/${event.id}`).set(as('admin')).expect(204);
     await http().get(`/api/events/${event.id}`).set(as('admin')).expect(404);
     expect(storage.objects.size).toBe(before - 1);
+  });
+
+  describe('adding people (event creator)', () => {
+    const addPeople = (who: string, eventId: string, body: { emails?: string[]; usernames?: string[] }) =>
+      http().post(`/api/events/${eventId}/invitations`).set(as(who)).send(body);
+
+    it('only lets the creator add people, see and revoke invitations', async () => {
+      await login('admin2', 'admin2@example.com');
+      await saveProfile('admin2').expect(200);
+      const { body: event } = await createEvent().expect(201);
+      expect(event.isCreator).toBe(true);
+      expect((await http().get(`/api/events/${event.id}`).set(as('admin2'))).body.isCreator).toBe(false);
+
+      await addPeople('admin2', event.id, { usernames: ['alice'] }).expect(403);
+      await addPeople('alice', event.id, { usernames: ['bob'] }).expect(403);
+      await http().get(`/api/events/${event.id}/invitations`).set(as('admin2')).expect(403);
+      await addPeople('admin', event.id, {}).expect(400);
+      await addPeople('admin', event.id, { emails: ['not-an-email'] }).expect(400);
+    });
+
+    it('signs up existing users by username or email, waitlisting when full', async () => {
+      const { body: event } = await createEvent({ capacity: '1' }).expect(201);
+      mailSender.sent = [];
+      const res = await addPeople('admin', event.id, {
+        usernames: ['@Alice', 'nobody_here'],
+        emails: ['BOB@example.com', 'alice@example.com'],
+      }).expect(200);
+      expect(res.body).toEqual([
+        { input: 'alice', status: 'CONFIRMED', name: 'alice' },
+        { input: 'nobody_here', status: 'NOT_FOUND' },
+        { input: 'bob@example.com', status: 'WAITLISTED', name: 'bob' },
+        // Same person by email and by username: added once.
+        { input: 'alice@example.com', status: 'CONFIRMED', name: 'alice' },
+      ]);
+
+      const again = await addPeople('admin', event.id, { usernames: ['bob'] }).expect(200);
+      expect(again.body[0].status).toBe('ALREADY_REGISTERED');
+      const detail = (await http().get(`/api/events/${event.id}`).set(as('alice'))).body;
+      expect(detail).toMatchObject({ confirmedCount: 1, waitlistCount: 1, myStatus: 'CONFIRMED' });
+      expect(mailSender.sent).toEqual([]); // existing users with a profile get a push, not an email
+    });
+
+    it('emails a sign-up link to unknown emails and signs them up once their profile is saved', async () => {
+      const { body: event } = await createEvent({ name: 'Invite Party' }).expect(201);
+      mailSender.sent = [];
+      const res = await addPeople('admin', event.id, { emails: ['newbie@example.com'] }).expect(200);
+      expect(res.body).toEqual([{ input: 'newbie@example.com', status: 'INVITED', emailSent: true }]);
+
+      expect(mailSender.sent).toHaveLength(1);
+      expect(mailSender.sent[0]).toMatchObject({ to: 'newbie@example.com', subject: 'admin invited you to Invite Party' });
+      expect(mailSender.sent[0].text).toContain(`http://localhost:5173/events/${event.id}`);
+
+      const pending = (await http().get(`/api/events/${event.id}/invitations`).set(as('admin')).expect(200)).body;
+      expect(pending).toEqual([{ email: 'newbie@example.com', invitedAt: expect.any(String) }]);
+
+      // Signing in alone isn't enough: the profile (emergency contact) comes first.
+      await login('newbie', 'Newbie@Example.com');
+      expect((await http().get(`/api/events/${event.id}`).set(as('newbie'))).body.myStatus).toBeNull();
+      const pendingProfile = await addPeople('admin', event.id, { emails: ['newbie@example.com'] });
+      expect(pendingProfile.body[0]).toMatchObject({ status: 'PENDING_PROFILE', emailSent: true });
+
+      await saveProfile('newbie').expect(200);
+      expect((await http().get(`/api/events/${event.id}`).set(as('newbie'))).body.myStatus).toBe('CONFIRMED');
+      expect((await http().get(`/api/events/${event.id}/invitations`).set(as('admin'))).body).toEqual([]);
+    });
+
+    it('revokes pending invitations', async () => {
+      const { body: event } = await createEvent().expect(201);
+      await addPeople('admin', event.id, { emails: ['ghost@example.com'] }).expect(200);
+      await http().delete(`/api/events/${event.id}/invitations/ghost%40example.com`).set(as('admin')).expect(204);
+      await http().delete(`/api/events/${event.id}/invitations/ghost%40example.com`).set(as('admin')).expect(404);
+
+      await login('ghost', 'ghost@example.com');
+      await saveProfile('ghost').expect(200);
+      expect((await http().get(`/api/events/${event.id}`).set(as('ghost'))).body.myStatus).toBeNull();
+    });
+
+    it('refuses to add people to events that already started', async () => {
+      const { body: event } = await createEvent({ startsAt: new Date(Date.now() - 60_000).toISOString() }).expect(201);
+      await addPeople('admin', event.id, { usernames: ['alice'] }).expect(400);
+    });
   });
 
   it('returns 400 for malformed ids', async () => {

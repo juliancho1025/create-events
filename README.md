@@ -17,7 +17,7 @@ Only admins and people signed up (confirmed or waitlisted) can see who's attendi
 corepack enable            # one-time: puts `pnpm` on your PATH (pinned in package.json)
 pnpm install
 cp .env.example apps/api/.env
-pnpm infra:up              # MongoDB :27017 + S3 :8333 (docker compose)
+pnpm infra:up              # MongoDB :27017 + S3 :8333 + Mailpit :8025 (docker compose)
 pnpm dev                   # API :3000 + web :5173
 ```
 
@@ -125,3 +125,11 @@ and to admins (in the attendee list). The login name only seeds a new account, s
 never overwritten by Google's. Users can also upload a profile photo (same rules and storage as event
 images, served at `GET /api/users/:id/avatar`); it takes priority over the Google picture, and removing it
 falls back to that, or to initials.
+
+**Adding people.** The admin who created an event can add people from its page, by email or `@username`
+(`POST /api/events/:id/invitations`), until it starts. Users with a saved profile are signed up right away,
+with the same seat/waitlist rules as a self sign-up, and get a push. Everyone else (unknown emails, or accounts
+without a profile) gets a pending invitation and an email with a link to the event; they are signed up when they
+save their profile, matched by email, so they must sign in with the address they were invited at. The creator
+sees and can cancel pending invitations. Emails go over SMTP (`SMTP_URL`); locally Mailpit catches them at
+http://localhost:8025, and without `SMTP_URL` they are only logged.

@@ -1,9 +1,12 @@
 import type {
+  AddPeopleInput,
+  AddPersonResult,
   Attendees,
   AuthProviders,
   EventInput,
   EventItem,
   EventScope,
+  Invitation,
   MetricsReport,
   ProfileInput,
   PushSubscriptionInput,
@@ -104,6 +107,12 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClient
     kickAttendee: (eventId: string, userId: string) =>
       request<void>(`/events/${eventId}/registrations/${userId}`, { method: 'DELETE' }),
     attendees: (eventId: string) => request<Attendees>(`/events/${eventId}/attendees`),
+
+    addPeople: (eventId: string, input: AddPeopleInput) =>
+      request<AddPersonResult[]>(`/events/${eventId}/invitations`, { method: 'POST', body: JSON.stringify(input) }),
+    invitations: (eventId: string) => request<Invitation[]>(`/events/${eventId}/invitations`),
+    revokeInvitation: (eventId: string, email: string) =>
+      request<void>(`/events/${eventId}/invitations/${encodeURIComponent(email)}`, { method: 'DELETE' }),
 
     setMetric: (eventId: string, metric: string, userId: string, marked: boolean) =>
       request<void>(`/events/${eventId}/metrics/${encodeURIComponent(metric)}/users/${userId}`, {

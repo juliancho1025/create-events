@@ -49,6 +49,8 @@ export interface EventItem {
   myStatus: RegistrationStatus | null;
   myWaitlistPosition: number | null;
   metrics: EventMetric[];
+  /** The admin who created it: only they can add people. */
+  isCreator: boolean;
 }
 
 export interface EventMetric {
@@ -110,6 +112,37 @@ export interface ReviewInput {
 export interface RegistrationResult {
   status: RegistrationStatus;
   waitlistPosition: number | null;
+}
+
+/** People the event creator adds; usernames with or without "@". */
+export interface AddPeopleInput {
+  emails?: string[];
+  usernames?: string[];
+}
+
+export type AddPersonStatus =
+  /** Signed up now, with a seat / on the waitlist. */
+  | 'CONFIRMED'
+  | 'WAITLISTED'
+  | 'ALREADY_REGISTERED'
+  /** No account with that email: an invitation with a sign-up link was emailed. */
+  | 'INVITED'
+  /** Has an account but no profile yet: signed up as soon as they save it. */
+  | 'PENDING_PROFILE'
+  /** No user with that username. */
+  | 'NOT_FOUND';
+
+export interface AddPersonResult {
+  input: string;
+  status: AddPersonStatus;
+  name?: string;
+  emailSent?: boolean;
+}
+
+/** Waiting for the person to sign up or finish their profile. */
+export interface Invitation {
+  email: string;
+  invitedAt: string;
 }
 
 export interface AuthProviders {
