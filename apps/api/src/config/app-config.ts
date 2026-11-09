@@ -45,6 +45,11 @@ export const appConfig = registerAs('app', () => {
       privateKey: env.VAPID_PRIVATE_KEY ?? '',
       subject: env.VAPID_SUBJECT ?? 'mailto:admin@example.com',
     },
+    /** Outgoing email (invitations). Without SMTP_URL emails are only logged. */
+    mail: {
+      smtpUrl: env.SMTP_URL ?? '',
+      from: env.MAIL_FROM ?? 'Events <no-reply@localhost>',
+    },
   };
 });
 

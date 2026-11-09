@@ -109,6 +109,7 @@ export class EventDto {
   @ApiProperty() confirmedCount: number;
   @ApiProperty() waitlistCount: number;
   @ApiProperty({ type: [EventMetricDto] }) metrics: EventMetricDto[];
+  @ApiProperty({ description: 'True for the admin who created it: they can add people' }) isCreator: boolean;
   @ApiPropertyOptional({ enum: RegistrationStatus, nullable: true })
   myStatus: RegistrationStatus | null;
   @ApiPropertyOptional({ nullable: true, description: '1-based position if waitlisted' })

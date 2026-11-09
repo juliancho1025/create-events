@@ -16,6 +16,13 @@ services:
     volumes:
       - s3-data:/data
 
+  # Catches outgoing email (invitations) locally. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   mongo-data:
   s3-data:

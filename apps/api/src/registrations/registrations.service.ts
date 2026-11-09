@@ -52,27 +52,33 @@ export class RegistrationsService {
     if (!(await this.userModel.exists({ _id: userId, profileCompletedAt: { $exists: true } }))) {
       throw new BadRequestException('Complete your profile before signing up for events');
     }
-    if (await this.registrationModel.exists({ event: event._id, user: userId })) {
-      throw new ConflictException('You are already signed up for this event');
-    }
+    const registration = await this.enroll(event._id, userId);
+    if (!registration) throw new ConflictException('You are already signed up for this event');
+    return {
+      status: registration.status,
+      waitlistPosition:
+        registration.status === RegistrationStatus.CONFIRMED ? null : await this.waitlistPosition(registration),
+    };
+  }
 
-    const gotSeat = await this.claimSeat(event._id);
+  /**
+   * Signs the user up: a seat if one is free, else the waitlist. Returns null if
+   * they were already signed up. Callers check the event and the user's profile.
+   */
+  async enroll(eventId: Types.ObjectId, userId: string | Types.ObjectId): Promise<RegistrationDocument | null> {
+    if (await this.registrationModel.exists({ event: eventId, user: userId })) return null;
+
+    const gotSeat = await this.claimSeat(eventId);
     try {
-      const registration = await this.registrationModel.create({
-        event: event._id,
+      return await this.registrationModel.create({
+        event: eventId,
         user: new Types.ObjectId(userId),
         status: gotSeat ? RegistrationStatus.CONFIRMED : RegistrationStatus.WAITLISTED,
       });
-      return {
-        status: registration.status,
-        waitlistPosition: gotSeat ? null : await this.waitlistPosition(registration),
-      };
     } catch (err) {
       // Double-submit race: the unique index rejected the second insert.
-      if (gotSeat) await this.releaseSeat(event._id);
-      if ((err as { code?: number }).code === 11000) {
-        throw new ConflictException('You are already signed up for this event');
-      }
+      if (gotSeat) await this.releaseSeat(eventId);
+      if ((err as { code?: number }).code === 11000) return null;
       throw err;
     }
   }

@@ -9,3 +9,4 @@ export * from './MetricsEditor';
 export * from './EventReviews';
 export * from './NotificationsEditor';
 export * from './ProfileForm';
+export * from './AddPeople';

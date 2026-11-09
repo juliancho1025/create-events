@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi, useApiContext } from './auth';
-import type { Attendees, EventInput, EventScope, ProfileInput, ReviewInput, UploadableImage, User } from './types';
+import type { AddPeopleInput, Attendees, EventInput, EventScope, ProfileInput, ReviewInput, UploadableImage, User } from './types';
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -12,6 +12,7 @@ export const queryKeys = {
   metricsReport: ['events', 'metrics-report'] as const,
   reviews: (id: string) => ['events', 'reviews', id] as const,
   notifications: (id: string) => ['events', 'notifications', id] as const,
+  invitations: (id: string) => ['events', 'invitations', id] as const,
 };
 
 /** Current user, or undefined while logged out. `isAdmin` drives admin-only UI. */
@@ -127,6 +128,25 @@ export function useKickAttendee(eventId: string) {
     mutationFn: (userId: string) => api.kickAttendee(eventId, userId),
     onSettled: invalidate,
   });
+}
+
+/** Pending invitations of an event (its creator only). */
+export function useInvitations(eventId: string, enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.invitations(eventId), queryFn: () => api.invitations(eventId), enabled });
+}
+
+/** Adding people changes counts, attendee lists and invitations: all under the events key. */
+export function useAddPeople(eventId: string) {
+  const api = useApi();
+  const invalidate = useInvalidateEvents();
+  return useMutation({ mutationFn: (input: AddPeopleInput) => api.addPeople(eventId, input), onSettled: invalidate });
+}
+
+export function useRevokeInvitation(eventId: string) {
+  const api = useApi();
+  const invalidate = useInvalidateEvents();
+  return useMutation({ mutationFn: (email: string) => api.revokeInvitation(eventId, email), onSettled: invalidate });
 }
 
 export function useMetricsReport() {

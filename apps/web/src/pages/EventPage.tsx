@@ -1,5 +1,6 @@
 import {
   isPast,
+  useAddPeople,
   useApi,
   useAttendees,
   useCancelRegistration,
@@ -7,13 +8,15 @@ import {
   useDeleteEvent,
   useDeleteReview,
   useEvent,
+  useInvitations,
   useKickAttendee,
   useRegister,
+  useRevokeInvitation,
   useReviews,
   useSaveReview,
   useSetMetric,
 } from '@events/shared';
-import { AttendeeList, ErrorText, EventDetails, EventReviews } from '@events/ui';
+import { AddPeople, AttendeeList, ErrorText, EventDetails, EventReviews } from '@events/ui';
 import { ArrowLeft, Lock, Pencil, Trash2 } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -39,6 +42,11 @@ export function EventPage() {
   // Attendee list is only visible to admins and people signed up (confirmed or waitlisted).
   const canSeeAttendees = isAdmin || !!event?.myStatus;
   const attendees = useAttendees(id, canSeeAttendees);
+  // Only the creator adds people, and only until the event starts (the API enforces both).
+  const canAddPeople = !!event?.isCreator && !isPast(event);
+  const invitations = useInvitations(id, canAddPeople);
+  const addPeople = useAddPeople(id);
+  const revokeInvitation = useRevokeInvitation(id);
 
   if (isPending || error) return <PageState loading={isPending} error={error} />;
 
@@ -110,32 +118,46 @@ export function EventPage() {
           )}
         </YStack>
 
-        <Card flex={1} flexBasis={280} minW={260} maxW={420} p="$4" gap="$3" borderWidth={1} borderColor="$borderColor">
-          {canSeeAttendees ? (
-            attendees.data ? (
-              <AttendeeList
-                attendees={attendees.data}
-                currentUserId={user?.id}
-                onKick={isAdmin ? (userId) => kick.mutate(userId) : undefined}
-                kickPending={kick.isPending}
-                metrics={event.metrics}
-                onToggleMetric={
-                  isAdmin ? (userId, metric, marked) => setMetric.mutate({ userId, metric, marked }) : undefined
-                }
+        <YStack flex={1} flexBasis={280} minW={260} maxW={420} gap="$4">
+          {canAddPeople && (
+            <Card p="$4" borderWidth={1} borderColor="$borderColor">
+              <AddPeople
+                onAdd={(input) => addPeople.mutateAsync(input)}
+                pending={addPeople.isPending}
+                error={(addPeople.error ?? revokeInvitation.error ?? invitations.error)?.message}
+                invitations={invitations.data}
+                onRevoke={(email) => revokeInvitation.mutate(email)}
+                revokePending={revokeInvitation.isPending}
               />
-            ) : (
-              <PageState loading={attendees.isPending} error={attendees.error} />
-            )
-          ) : (
-            <YStack gap="$2" items="center" py="$4">
-              <Lock size={20} color="$color10" />
-              <H4>Who's going?</H4>
-              <Paragraph color="$color10" text="center">
-                Sign up to see the attendee list.
-              </Paragraph>
-            </YStack>
+            </Card>
           )}
-        </Card>
+          <Card p="$4" gap="$3" borderWidth={1} borderColor="$borderColor">
+            {canSeeAttendees ? (
+              attendees.data ? (
+                <AttendeeList
+                  attendees={attendees.data}
+                  currentUserId={user?.id}
+                  onKick={isAdmin ? (userId) => kick.mutate(userId) : undefined}
+                  kickPending={kick.isPending}
+                  metrics={event.metrics}
+                  onToggleMetric={
+                    isAdmin ? (userId, metric, marked) => setMetric.mutate({ userId, metric, marked }) : undefined
+                  }
+                />
+              ) : (
+                <PageState loading={attendees.isPending} error={attendees.error} />
+              )
+            ) : (
+              <YStack gap="$2" items="center" py="$4">
+                <Lock size={20} color="$color10" />
+                <H4>Who's going?</H4>
+                <Paragraph color="$color10" text="center">
+                  Sign up to see the attendee list.
+                </Paragraph>
+              </YStack>
+            )}
+          </Card>
+        </YStack>
       </XStack>
     </YStack>
   );
