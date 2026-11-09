@@ -37,6 +37,15 @@ Open http://localhost:5173 and use the **dev login**. `admin@example.com` is the
 3. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `apps/api/.env`, restart the API.
 4. Set `DEV_LOGIN_ENABLED=false` anywhere that isn't your laptop.
 
+### Sharing over the internet (ngrok)
+
+Stop `pnpm dev`, then run `pnpm tunnel` instead. It opens an ngrok tunnel to the web dev server (which proxies
+`/api`), points `WEB_URL` and `GOOGLE_CALLBACK_URL` in `apps/api/.env` at the tunnel, turns the dev login off
+(anyone on the internet could otherwise log in as admin) and starts the app. Ctrl+C restores `.env`.
+
+The free ngrok URL changes on every run, so add the redirect URI it prints to the Google OAuth client
+(*Authorized redirect URIs*) each time. Push notifications work too, since the tunnel is HTTPS.
+
 ### Enabling push notifications
 
 1. `npx web-push generate-vapid-keys`

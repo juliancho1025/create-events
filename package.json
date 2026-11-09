@@ -8,6 +8,7 @@
     "dev": "pnpm --parallel --filter \"./apps/*\" run dev",
     "dev:api": "pnpm --filter @events/api dev",
     "dev:web": "pnpm --filter @events/web dev",
+    "tunnel": "./scripts/tunnel.sh",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
