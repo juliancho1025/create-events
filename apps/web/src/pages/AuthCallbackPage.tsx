@@ -1,4 +1,4 @@
-import { useApiContext } from '@events/shared';
+import { useApiContext, useT } from '@events/shared';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { PageState } from '../components/PageState';
@@ -7,6 +7,7 @@ import { PageState } from '../components/PageState';
 export function AuthCallbackPage() {
   const { signIn } = useApiContext();
   const navigate = useNavigate();
+  const t = useT();
   const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
   const handled = useRef(false);
 
@@ -16,5 +17,5 @@ export function AuthCallbackPage() {
     void signIn(token).then(() => navigate('/', { replace: true }));
   }, [token, signIn, navigate]);
 
-  return token ? <PageState loading /> : <PageState error={new Error('Login failed: no token received')} />;
+  return token ? <PageState loading /> : <PageState error={new Error(t.login.noToken)} />;
 }

@@ -59,9 +59,6 @@ export interface EventMetric {
   label: string;
 }
 
-/** Pre-selected when creating an event; admins can remove them or add their own. */
-export const RECOMMENDED_METRICS = ['No-show', 'Tardiness', 'Late payment'];
-
 export interface Attendee {
   userId: string;
   name: string;

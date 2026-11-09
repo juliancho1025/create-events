@@ -1,4 +1,4 @@
-import { ApiError, ApiProvider } from '@events/shared';
+import { ApiError, ApiProvider, I18nProvider } from '@events/shared';
 import { config } from '@events/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MetricsPage } from './pages/MetricsPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { initialLocale, saveLocale } from './locale';
 import { localTokenStorage } from './tokenStorage';
 
 const queryClient = new QueryClient({
@@ -63,6 +64,9 @@ function useSystemColorScheme(): 'light' | 'dark' {
   return dark ? 'dark' : 'light';
 }
 
+const startLocale = initialLocale();
+document.documentElement.lang = startLocale;
+
 export function App() {
   const scheme = useSystemColorScheme();
   useEffect(() => {
@@ -72,9 +76,11 @@ export function App() {
   return (
     <TamaguiProvider config={config} defaultTheme={scheme}>
       <QueryClientProvider client={queryClient}>
-        <ApiProvider baseUrl="" storage={localTokenStorage}>
-          <RouterProvider router={router} />
-        </ApiProvider>
+        <I18nProvider initialLocale={startLocale} onLocaleChange={saveLocale}>
+          <ApiProvider baseUrl="" storage={localTokenStorage}>
+            <RouterProvider router={router} />
+          </ApiProvider>
+        </I18nProvider>
       </QueryClientProvider>
     </TamaguiProvider>
   );

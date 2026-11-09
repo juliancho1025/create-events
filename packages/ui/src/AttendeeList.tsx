@@ -1,4 +1,4 @@
-import type { Attendee, Attendees, EventMetric } from '@events/shared';
+import { useT, type Attendee, type Attendees, type EventMetric } from '@events/shared';
 import { Check, UserX } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
 import { Avatar, Button, H5, Paragraph, Separator, Text, Theme, XStack, YStack } from 'tamagui';
@@ -22,13 +22,14 @@ export function AttendeeList({
   onToggleMetric,
   ...kick
 }: { attendees: Attendees; currentUserId?: string } & KickProps & MetricProps) {
+  const t = useT();
   return (
     <YStack gap="$4">
       <Section
-        title={`Going (${attendees.confirmed.length})`}
+        title={t.attendees.going(attendees.confirmed.length)}
         people={attendees.confirmed}
         currentUserId={currentUserId}
-        empty="Nobody yet."
+        empty={t.attendees.nobody}
         metrics={metrics}
         onToggleMetric={onToggleMetric}
         {...kick}
@@ -37,7 +38,7 @@ export function AttendeeList({
         <>
           <Separator />
           <Section
-            title={`Waitlist (${attendees.waitlist.length})`}
+            title={t.attendees.waitlist(attendees.waitlist.length)}
             people={attendees.waitlist}
             currentUserId={currentUserId}
             numbered
@@ -67,6 +68,7 @@ function Section({
   numbered?: boolean;
 } & KickProps &
   MetricProps) {
+  const t = useT();
   const [confirmKick, setConfirmKick] = useState<string | null>(null);
   return (
     <YStack gap="$2.5">
@@ -91,7 +93,7 @@ function Section({
             <YStack flex={1}>
               <Text fontWeight={person.userId === currentUserId ? '700' : '400'}>
                 {person.name}
-                {person.userId === currentUserId ? ' (you)' : ''}
+                {person.userId === currentUserId ? ` ${t.common.you}` : ''}
               </Text>
               {(person.username || person.email) && (
                 <Text fontSize="$2" color="$color10">
@@ -105,13 +107,13 @@ function Section({
               )}
               {person.emergencyContact && (
                 <Text fontSize="$2" color="$color10">
-                  Emergency: {person.emergencyContact.name}, {person.emergencyContact.phone}
+                  {t.attendees.emergency(person.emergencyContact.name, person.emergencyContact.phone)}
                 </Text>
               )}
               {person.allergies && (
                 <Theme name="red">
                   <Text fontSize="$2" color="$color10" fontWeight="600">
-                    Allergies: {person.allergies}
+                    {t.attendees.allergies(person.allergies)}
                   </Text>
                 </Theme>
               )}
@@ -120,10 +122,10 @@ function Section({
               (confirmKick === person.userId ? (
                 <XStack gap="$1">
                   <Button size="$2" theme="red" disabled={kickPending} onPress={() => onKick(person.userId)}>
-                    Kick out?
+                    {t.attendees.kickConfirm}
                   </Button>
                   <Button size="$2" chromeless onPress={() => setConfirmKick(null)}>
-                    Keep
+                    {t.common.keep}
                   </Button>
                 </XStack>
               ) : (
@@ -132,10 +134,10 @@ function Section({
                   chromeless
                   theme="red"
                   icon={<UserX size={14} />}
-                  aria-label={`Remove ${person.name}`}
+                  aria-label={t.attendees.removeLabel(person.name)}
                   onPress={() => setConfirmKick(person.userId)}
                 >
-                  Remove
+                  {t.common.remove}
                 </Button>
               ))}
           </XStack>
@@ -154,7 +156,7 @@ function Section({
                     borderColor={marked ? '$color8' : '$borderColor'}
                     icon={marked ? <Check size={12} /> : undefined}
                     aria-pressed={marked}
-                    aria-label={`${label} for ${person.name}: ${marked ? 'yes' : 'no'}`}
+                    aria-label={t.attendees.metricLabel(label, person.name, marked)}
                     onPress={() => onToggleMetric(person.userId, key, !marked)}
                   >
                     {label}

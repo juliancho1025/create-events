@@ -1,4 +1,4 @@
-import { MAX_RATING, type Review, type ReviewInput, type Reviews } from '@events/shared';
+import { MAX_RATING, useT, type Review, type ReviewInput, type Reviews } from '@events/shared';
 import { Pencil, Star, Trash2 } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
 import { Avatar, Button, H5, Paragraph, Separator, Spinner, Text, TextArea, Theme, useTheme, XStack, YStack } from 'tamagui';
@@ -28,6 +28,7 @@ export function EventReviews({
   deletePending,
   canModerate,
 }: EventReviewsProps) {
+  const t = useT();
   const mine = reviews.reviews.find((r) => r.userId === currentUserId);
   const [editing, setEditing] = useState(false);
   const showForm = !!onSave && (!mine || editing);
@@ -35,13 +36,13 @@ export function EventReviews({
   return (
     <YStack gap="$4">
       <XStack gap="$3" items="center" flexWrap="wrap">
-        <H5>Reviews</H5>
+        <H5>{t.reviews.title}</H5>
         {reviews.average !== null && (
           <XStack gap="$2" items="center">
             <Stars rating={reviews.average} size={16} />
             <Text fontWeight="600">{reviews.average.toFixed(1)}</Text>
             <Text color="$color10" fontSize="$2">
-              ({reviews.count} {reviews.count === 1 ? 'rating' : 'ratings'})
+              {t.reviews.ratings(reviews.count)}
             </Text>
           </XStack>
         )}
@@ -60,7 +61,7 @@ export function EventReviews({
         />
       )}
 
-      {reviews.count === 0 && !showForm && <Paragraph color="$color10">No reviews yet.</Paragraph>}
+      {reviews.count === 0 && !showForm && <Paragraph color="$color10">{t.reviews.none}</Paragraph>}
 
       {reviews.reviews.map((review, i) => (
         <YStack key={review.userId} gap="$4">
@@ -91,18 +92,19 @@ function ReviewForm({
   onSubmit: (input: ReviewInput) => void;
   onCancel?: () => void;
 }) {
+  const t = useT();
   // Null until picked, so "0 stars" is a deliberate choice rather than the default.
   const [rating, setRating] = useState<number | null>(initial?.rating ?? null);
   const [comment, setComment] = useState(initial?.comment ?? '');
 
   return (
     <YStack gap="$2.5" p="$3" rounded="$4" borderWidth={1} borderColor="$borderColor">
-      <Text fontWeight="600">{initial ? 'Edit your review' : 'How was it?'}</Text>
+      <Text fontWeight="600">{initial ? t.reviews.editYours : t.reviews.howWasIt}</Text>
       <StarPicker value={rating} onChange={setRating} />
       <TextArea
         value={comment}
         onChangeText={setComment}
-        placeholder="Leave a public comment (optional)"
+        placeholder={t.reviews.commentPlaceholder}
         placeholderTextColor="$color8"
         maxLength={MAX_COMMENT_LENGTH}
         minH={80}
@@ -110,7 +112,7 @@ function ReviewForm({
       <XStack gap="$2" justify="flex-end">
         {onCancel && (
           <Button size="$3" chromeless onPress={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
         )}
         <Button
@@ -120,7 +122,7 @@ function ReviewForm({
           icon={pending ? <Spinner /> : undefined}
           onPress={() => rating !== null && onSubmit({ rating, comment: comment.trim() })}
         >
-          {initial ? 'Save' : 'Post review'}
+          {initial ? t.common.save : t.reviews.post}
         </Button>
       </XStack>
     </YStack>
@@ -140,6 +142,7 @@ function ReviewItem({
   onDelete?: () => void;
   deletePending?: boolean;
 }) {
+  const t = useT();
   const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <YStack gap="$2">
@@ -155,23 +158,23 @@ function ReviewItem({
         <YStack flex={1} gap="$1">
           <Text fontWeight={isMine ? '700' : '400'}>
             {review.name}
-            {isMine ? ' (you)' : ''}
+            {isMine ? ` ${t.common.you}` : ''}
           </Text>
           <Stars rating={review.rating} size={14} />
         </YStack>
         {onEdit && (
           <Button size="$2" chromeless icon={<Pencil size={14} />} onPress={onEdit}>
-            Edit
+            {t.common.edit}
           </Button>
         )}
         {onDelete &&
           (confirmDelete ? (
             <XStack gap="$1">
               <Button size="$2" theme="red" disabled={deletePending} onPress={onDelete}>
-                Delete?
+                {t.reviews.deleteConfirm}
               </Button>
               <Button size="$2" chromeless onPress={() => setConfirmDelete(false)}>
-                Keep
+                {t.common.keep}
               </Button>
             </XStack>
           ) : (
@@ -180,7 +183,7 @@ function ReviewItem({
               chromeless
               theme="red"
               icon={<Trash2 size={14} />}
-              aria-label={`Delete review by ${review.name}`}
+              aria-label={t.reviews.deleteLabel(review.name)}
               onPress={() => setConfirmDelete(true)}
             />
           ))}
@@ -192,10 +195,11 @@ function ReviewItem({
 
 /** Read-only stars; a fractional rating (e.g. the average) rounds to the nearest whole star. */
 export function Stars({ rating, size = 16 }: { rating: number; size?: number }) {
+  const t = useT();
   const filled = Math.round(rating);
   return (
     <Theme name="yellow">
-      <XStack gap="$0.5" role="img" aria-label={`${rating.toFixed(1)} out of ${MAX_RATING} stars`}>
+      <XStack gap="$0.5" role="img" aria-label={t.reviews.starsLabel(rating.toFixed(1), MAX_RATING)}>
         {STARS.map((n) => (
           <StarIcon key={n} filled={n <= filled} size={size} />
         ))}
@@ -205,6 +209,7 @@ export function Stars({ rating, size = 16 }: { rating: number; size?: number }) 
 }
 
 function StarPicker({ value, onChange }: { value: number | null; onChange: (rating: number) => void }) {
+  const t = useT();
   return (
     <XStack gap="$1" items="center" flexWrap="wrap">
       <Button
@@ -216,7 +221,7 @@ function StarPicker({ value, onChange }: { value: number | null; onChange: (rati
         aria-pressed={value === 0}
         onPress={() => onChange(0)}
       >
-        0 stars
+        {t.reviews.zeroStars}
       </Button>
       <Theme name="yellow">
         {STARS.map((n) => (
@@ -225,7 +230,7 @@ function StarPicker({ value, onChange }: { value: number | null; onChange: (rati
             size="$3"
             circular
             chromeless
-            aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
+            aria-label={t.reviews.starCount(n)}
             aria-pressed={value === n}
             icon={<StarIcon filled={value !== null && n <= value} size={22} />}
             onPress={() => onChange(n)}

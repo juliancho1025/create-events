@@ -1,4 +1,4 @@
-import { useApi, useCurrentUser, useEvents, type EventScope } from '@events/shared';
+import { useApi, useCurrentUser, useEvents, useT, type EventScope } from '@events/shared';
 import { EventCard } from '@events/ui';
 import { Plus } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
@@ -12,20 +12,21 @@ export function EventsPage() {
   const { isAdmin } = useCurrentUser();
   const api = useApi();
   const navigate = useNavigate();
+  const t = useT();
 
   return (
     <YStack gap="$5">
       <XStack justify="space-between" items="center" flexWrap="wrap" gap="$3">
-        <H2>Events</H2>
+        <H2>{t.events.title}</H2>
         <XStack gap="$2" items="center">
           {(['upcoming', 'past'] as const).map((s) => (
             <Button key={s} size="$3" theme={scope === s ? 'accent' : undefined} chromeless={scope !== s} onPress={() => setScope(s)}>
-              {s === 'upcoming' ? 'Upcoming' : 'Past'}
+              {s === 'upcoming' ? t.events.upcoming : t.events.past}
             </Button>
           ))}
           {isAdmin && (
             <Button size="$3" theme="accent" icon={<Plus size={16} />} onPress={() => navigate('/events/new')}>
-              New event
+              {t.events.newEvent}
             </Button>
           )}
         </XStack>
@@ -35,7 +36,7 @@ export function EventsPage() {
         <PageState
           loading={isPending}
           error={error}
-          empty={scope === 'upcoming' ? `No upcoming events${isAdmin ? '. Create the first one!' : ' yet.'}` : 'No past events.'}
+          empty={scope === 'upcoming' ? (isAdmin ? t.events.noUpcomingAdmin : t.events.noUpcoming) : t.events.noPast}
         />
       ) : (
         <XStack flexWrap="wrap" mx="$-2">

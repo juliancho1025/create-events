@@ -1,4 +1,4 @@
-import { RECOMMENDED_METRICS, type EventInput, type NotificationInput, type UploadableImage } from '@events/shared';
+import { useT, type EventInput, type NotificationInput, type UploadableImage } from '@events/shared';
 import { useState, type ComponentType } from 'react';
 import { Button, Form, Input, Label, Paragraph, Spinner, TextArea, Theme, XStack, YStack } from 'tamagui';
 import { MetricsEditor } from './MetricsEditor';
@@ -62,13 +62,14 @@ export function EventForm({
   submitting,
   error,
 }: EventFormProps) {
+  const t = useT();
   const [name, setName] = useState(initial?.name ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [startsAt, setStartsAt] = useState<Date | null>(initial?.startsAt ?? null);
   const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : '20');
   const [image, setImage] = useState<PickedImage | null>(null);
-  const [metrics, setMetrics] = useState<string[]>(initial?.metrics ?? RECOMMENDED_METRICS);
+  const [metrics, setMetrics] = useState<string[]>(initial?.metrics ?? t.metricsEditor.recommended);
   const removedMetrics = initial?.metrics.filter((m) => !metrics.includes(m)) ?? [];
   const [notifications, setNotifications] = useState<NotificationDraft[]>(
     () => initial?.notifications.map(toDraft) ?? [],
@@ -80,18 +81,18 @@ export function EventForm({
 
   const validate = (): Errors => {
     const e: Errors = {};
-    if (!name.trim()) e.name = 'Name is required';
-    if (!address.trim()) e.address = 'Address is required';
-    if (!description.trim()) e.description = 'Description is required';
-    if (!startsAt) e.startsAt = 'Date and time are required';
-    else if (mode === 'create' && startsAt.getTime() <= openedAt) e.startsAt = 'Must be in the future';
+    if (!name.trim()) e.name = t.eventForm.errors.name;
+    if (!address.trim()) e.address = t.eventForm.errors.address;
+    if (!description.trim()) e.description = t.eventForm.errors.description;
+    if (!startsAt) e.startsAt = t.eventForm.errors.startsAt;
+    else if (mode === 'create' && startsAt.getTime() <= openedAt) e.startsAt = t.eventForm.errors.future;
     const cap = Number(capacity);
-    if (!Number.isInteger(cap) || cap < 1) e.capacity = 'Must be a whole number of at least 1';
-    if (mode === 'create' && !image) e.image = 'An image is required';
+    if (!Number.isInteger(cap) || cap < 1) e.capacity = t.eventForm.errors.capacity;
+    if (mode === 'create' && !image) e.image = t.eventForm.errors.image;
     return e;
   };
 
-  const parsedNotifications = notifications.map(fromDraft);
+  const parsedNotifications = notifications.map((d) => fromDraft(d, t));
   const notificationErrors = parsedNotifications.map((n) => (typeof n === 'string' ? n : undefined));
 
   const errors: Errors = submitted ? validate() : {};
@@ -113,44 +114,44 @@ export function EventForm({
 
   return (
     <Form onSubmit={submit} gap="$4">
-      <Field id="name" label="Name" error={errors.name}>
-        <Input id="name" value={name} onChangeText={setName} placeholder="Spring Boot meetup" placeholderTextColor="$color8" maxLength={120} />
+      <Field id="name" label={t.eventForm.name} error={errors.name}>
+        <Input id="name" value={name} onChangeText={setName} placeholder={t.eventForm.namePlaceholder} placeholderTextColor="$color8" maxLength={120} />
       </Field>
-      <Field id="address" label="Address" error={errors.address}>
-        <Input id="address" value={address} onChangeText={setAddress} placeholder="123 Main St, Springfield" placeholderTextColor="$color8" maxLength={300} />
+      <Field id="address" label={t.eventForm.address} error={errors.address}>
+        <Input id="address" value={address} onChangeText={setAddress} placeholder={t.eventForm.addressPlaceholder} placeholderTextColor="$color8" maxLength={300} />
       </Field>
       <XStack gap="$4" flexWrap="wrap">
         <YStack flex={2} minW={220}>
-          <Field id="startsAt" label="Starts at" error={errors.startsAt}>
+          <Field id="startsAt" label={t.eventForm.startsAt} error={errors.startsAt}>
             <DateTimeInput id="startsAt" value={startsAt} onChange={setStartsAt} />
           </Field>
         </YStack>
         <YStack flex={1} minW={120}>
-          <Field id="capacity" label="Capacity" error={errors.capacity}>
+          <Field id="capacity" label={t.eventForm.capacity} error={errors.capacity}>
             <Input id="capacity" value={capacity} onChangeText={setCapacity} inputMode="numeric" />
           </Field>
         </YStack>
       </XStack>
-      <Field id="description" label="Description" error={errors.description}>
+      <Field id="description" label={t.eventForm.description} error={errors.description}>
         <TextArea id="description" value={description} onChangeText={setDescription} minH={140} maxLength={5000} />
       </Field>
-      <Field id="image" label="Image" error={errors.image}>
+      <Field id="image" label={t.eventForm.image} error={errors.image}>
         <ImageInput value={image} existingUri={initial?.imageUri} onChange={setImage} />
       </Field>
 
-      <Field id="metrics" label="Attendee metrics">
+      <Field id="metrics" label={t.eventForm.metrics}>
         <Paragraph fontSize="$2" color="$color10" mt="$-1">
-          Things you can mark attendees with after the event. They add up across events in the Metrics report.
+          {t.eventForm.metricsHint}
         </Paragraph>
         <MetricsEditor value={metrics} onChange={setMetrics} />
         {removedMetrics.length > 0 && (
-          <ErrorText>Saving deletes this event's marks for: {removedMetrics.join(', ')}.</ErrorText>
+          <ErrorText>{t.eventForm.metricsRemoved(removedMetrics)}</ErrorText>
         )}
       </Field>
 
-      <Field id="notifications" label="Push notifications">
+      <Field id="notifications" label={t.eventForm.notifications}>
         <Paragraph fontSize="$2" color="$color10" mt="$-1">
-          Sent to confirmed attendees who turned on notifications. They move with the event if you change its date.
+          {t.eventForm.notificationsHint}
         </Paragraph>
         <NotificationsEditor
           value={notifications}
@@ -167,12 +168,12 @@ export function EventForm({
       <XStack gap="$3" justify="flex-end">
         {onCancel && (
           <Button chromeless onPress={onCancel} disabled={submitting}>
-            Cancel
+            {t.common.cancel}
           </Button>
         )}
         <Form.Trigger asChild disabled={submitting}>
           <Button theme="accent" icon={submitting ? <Spinner /> : undefined}>
-            {mode === 'create' ? 'Create event' : 'Save changes'}
+            {mode === 'create' ? t.eventForm.create : t.eventForm.saveChanges}
           </Button>
         </Form.Trigger>
       </XStack>

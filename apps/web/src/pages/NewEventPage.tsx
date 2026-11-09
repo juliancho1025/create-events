@@ -1,4 +1,4 @@
-import { useCreateEvent } from '@events/shared';
+import { useCreateEvent, useT } from '@events/shared';
 import { EventForm } from '@events/ui';
 import { useNavigate } from 'react-router';
 import { Card, H2, YStack } from 'tamagui';
@@ -7,10 +7,11 @@ import { WebDateTimeInput, WebImageInput } from '../components/WebInputs';
 export function NewEventPage() {
   const navigate = useNavigate();
   const create = useCreateEvent();
+  const t = useT();
 
   return (
     <YStack gap="$4" maxW={720} width="100%" mx="auto">
-      <H2>New event</H2>
+      <H2>{t.event.newTitle}</H2>
       <Card p="$5" borderWidth={1} borderColor="$borderColor">
         <EventForm
           mode="create"

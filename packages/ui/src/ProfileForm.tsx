@@ -1,4 +1,4 @@
-import type { ProfileInput, User } from '@events/shared';
+import { useT, type ProfileInput, type User } from '@events/shared';
 import { useState } from 'react';
 import { Button, Form, H5, Input, Paragraph, Spinner, TextArea, XStack, YStack } from 'tamagui';
 import { ErrorText, Field } from './EventForm';
@@ -19,6 +19,7 @@ export interface ProfileFormProps {
 }
 
 export function ProfileForm({ user, onSubmit, onCancel, submitting, error }: ProfileFormProps) {
+  const t = useT();
   const [name, setName] = useState(user.name);
   const [username, setUsername] = useState(user.username ?? '');
   const [phone, setPhone] = useState(user.phone ?? '');
@@ -29,14 +30,14 @@ export function ProfileForm({ user, onSubmit, onCancel, submitting, error }: Pro
 
   const validate = (): Errors => {
     const e: Errors = {};
-    if (!name.trim()) e.name = 'Name is required';
+    if (!name.trim()) e.name = t.profile.errors.name;
     const handle = username.trim().toLowerCase();
-    if (!handle) e.username = 'Username is required';
-    else if (!USERNAME.test(handle)) e.username = '3-30 letters, numbers, "_" or "."';
-    if (phone.trim() && !PHONE.test(phone.trim())) e.phone = 'Enter a phone number, e.g. +1 555 010 2030';
-    if (!contactName.trim()) e.contactName = 'Name is required';
-    if (!contactPhone.trim()) e.contactPhone = 'Phone is required';
-    else if (!PHONE.test(contactPhone.trim())) e.contactPhone = 'Enter a phone number, e.g. +1 555 010 2030';
+    if (!handle) e.username = t.profile.errors.username;
+    else if (!USERNAME.test(handle)) e.username = t.profile.errors.usernameFormat;
+    if (phone.trim() && !PHONE.test(phone.trim())) e.phone = t.profile.errors.phone;
+    if (!contactName.trim()) e.contactName = t.profile.errors.name;
+    if (!contactPhone.trim()) e.contactPhone = t.profile.errors.contactPhone;
+    else if (!PHONE.test(contactPhone.trim())) e.contactPhone = t.profile.errors.phone;
     return e;
   };
   const errors: Errors = submitted ? validate() : {};
@@ -57,12 +58,12 @@ export function ProfileForm({ user, onSubmit, onCancel, submitting, error }: Pro
     <Form onSubmit={submit} gap="$4">
       <XStack gap="$4" flexWrap="wrap">
         <YStack flex={1} minW={220}>
-          <Field id="name" label="Name" error={errors.name}>
+          <Field id="name" label={t.profile.name} error={errors.name}>
             <Input id="name" value={name} onChangeText={setName} maxLength={100} autoComplete="name" />
           </Field>
         </YStack>
         <YStack flex={1} minW={220}>
-          <Field id="username" label="Username" error={errors.username}>
+          <Field id="username" label={t.profile.username} error={errors.username}>
             <Input
               id="username"
               value={username}
@@ -76,35 +77,35 @@ export function ProfileForm({ user, onSubmit, onCancel, submitting, error }: Pro
           </Field>
         </YStack>
       </XStack>
-      <Field id="phone" label="Phone (optional)" error={errors.phone}>
+      <Field id="phone" label={t.profile.phone} error={errors.phone}>
         <Input id="phone" value={phone} onChangeText={setPhone} inputMode="tel" autoComplete="tel" maxLength={24} />
       </Field>
 
       <YStack gap="$2">
-        <H5>Emergency contact</H5>
+        <H5>{t.profile.emergencyContact}</H5>
         <Paragraph fontSize="$2" color="$color10" mt="$-1">
-          Only event organizers can see it, and only for events you sign up for.
+          {t.profile.emergencyHint}
         </Paragraph>
         <XStack gap="$4" flexWrap="wrap">
           <YStack flex={1} minW={220}>
-            <Field id="contactName" label="Name" error={errors.contactName}>
+            <Field id="contactName" label={t.profile.name} error={errors.contactName}>
               <Input id="contactName" value={contactName} onChangeText={setContactName} maxLength={100} />
             </Field>
           </YStack>
           <YStack flex={1} minW={220}>
-            <Field id="contactPhone" label="Phone" error={errors.contactPhone}>
+            <Field id="contactPhone" label={t.profile.contactPhone} error={errors.contactPhone}>
               <Input id="contactPhone" value={contactPhone} onChangeText={setContactPhone} inputMode="tel" maxLength={24} />
             </Field>
           </YStack>
         </XStack>
       </YStack>
 
-      <Field id="allergies" label="Allergies (optional)">
+      <Field id="allergies" label={t.profile.allergies}>
         <TextArea
           id="allergies"
           value={allergies}
           onChangeText={setAllergies}
-          placeholder="e.g. peanuts, penicillin"
+          placeholder={t.profile.allergiesPlaceholder}
           placeholderTextColor="$color8"
           maxLength={500}
           minH={80}
@@ -116,12 +117,12 @@ export function ProfileForm({ user, onSubmit, onCancel, submitting, error }: Pro
       <XStack gap="$3" justify="flex-end">
         {onCancel && (
           <Button chromeless onPress={onCancel} disabled={submitting}>
-            Cancel
+            {t.common.cancel}
           </Button>
         )}
         <Form.Trigger asChild disabled={submitting}>
           <Button theme="accent" icon={submitting ? <Spinner /> : undefined}>
-            {user.profileComplete ? 'Save profile' : 'Continue'}
+            {user.profileComplete ? t.profile.save : t.profile.continue}
           </Button>
         </Form.Trigger>
       </XStack>

@@ -1,4 +1,4 @@
-import { useApi, useRemoveAvatar, useUploadAvatar, type User } from '@events/shared';
+import { useApi, useRemoveAvatar, useT, useUploadAvatar, type User } from '@events/shared';
 import { ErrorText, initials } from '@events/ui';
 import { Camera, Trash2 } from '@tamagui/lucide-icons-2';
 import { useRef } from 'react';
@@ -7,6 +7,7 @@ import { Avatar, Button, Paragraph, Spinner, Text, XStack, YStack } from 'tamagu
 /** Profile photo with upload/remove. Uploads right away; it isn't part of the profile form's Save. */
 export function AvatarPicker({ user }: { user: User }) {
   const api = useApi();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadAvatar();
   const remove = useRemoveAvatar();
@@ -31,7 +32,7 @@ export function AvatarPicker({ user }: { user: User }) {
             disabled={pending}
             onPress={() => inputRef.current?.click()}
           >
-            {user.avatarUrl ? 'Change photo' : 'Upload photo'}
+            {user.avatarUrl ? t.profile.changePhoto : t.profile.uploadPhoto}
           </Button>
           {user.hasUploadedAvatar && (
             <Button
@@ -42,12 +43,12 @@ export function AvatarPicker({ user }: { user: User }) {
               disabled={pending}
               onPress={() => remove.mutate()}
             >
-              Remove
+              {t.common.remove}
             </Button>
           )}
         </XStack>
         <Paragraph fontSize="$2" color="$color10">
-          JPEG, PNG, WebP or GIF · max 5 MB
+          {t.common.imageHint}
         </Paragraph>
         {error && <ErrorText>{error.message}</ErrorText>}
       </YStack>

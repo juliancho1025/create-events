@@ -98,6 +98,7 @@ describe('Events API (e2e)', () => {
     Object.assign(process.env, {
       MONGO_URI: mongo.getUri('events-test'),
       JWT_SECRET: 'test-secret',
+      WEB_URL: 'http://localhost:5173', // not whatever the local apps/api/.env says
       ADMIN_EMAILS: 'admin@example.com,admin2@example.com',
       DEV_LOGIN_ENABLED: 'true',
       S3_BUCKET: 'test',

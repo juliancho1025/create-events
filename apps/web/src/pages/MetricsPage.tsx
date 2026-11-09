@@ -1,13 +1,12 @@
-import { useMetricsReport, type MetricCount, type MetricsReport } from '@events/shared';
+import { useI18n, useMetricsReport, useT, type MetricCount, type MetricsReport } from '@events/shared';
 import { ArrowDown } from '@tamagui/lucide-icons-2';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, H2, H4, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { HorizontalBars, percent, RateColumns } from '../components/charts';
 import { PageState } from '../components/PageState';
 
 const TOP_USERS = 10;
 const RECENT_EVENTS = 24;
-const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 
 const rate = (c?: MetricCount) => (c?.opportunities ? c.count / c.opportunities : 0);
 const sum = (counts: (MetricCount | undefined)[]) =>
@@ -15,18 +14,19 @@ const sum = (counts: (MetricCount | undefined)[]) =>
     count: 0,
     opportunities: 0,
   });
-const timesLabel = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
 
 export function MetricsPage() {
   const { data: report, isPending, error } = useMetricsReport();
   const [selected, setSelected] = useState<string | null>(null);
+  const { t, locale } = useI18n();
+  const shortDate = useMemo(() => new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }), [locale]);
 
   if (isPending || error) return <PageState loading={isPending} error={error} />;
   if (!report.metrics.length) {
     return (
       <YStack gap="$4">
-        <H2>Attendee metrics</H2>
-        <PageState empty="No started event tracks metrics yet. Add metrics to an event, then mark attendees after it starts." />
+        <H2>{t.metrics.title}</H2>
+        <PageState empty={t.metrics.empty} />
       </YStack>
     );
   }
@@ -35,15 +35,12 @@ export function MetricsPage() {
   return (
     <YStack gap="$5">
       <YStack gap="$1">
-        <H2>Attendee metrics</H2>
-        <Paragraph color="$color10">
-          Across {report.events.length} {report.events.length === 1 ? 'event' : 'events'} that have started. Rate = times
-          marked ÷ tracked events the person attended.
-        </Paragraph>
+        <H2>{t.metrics.title}</H2>
+        <Paragraph color="$color10">{t.metrics.intro(report.events.length)}</Paragraph>
       </YStack>
 
       {/* The tiles double as the metric filter for everything below. */}
-      <XStack gap="$3" flexWrap="wrap" role="radiogroup" aria-label="Metric">
+      <XStack gap="$3" flexWrap="wrap" role="radiogroup" aria-label={t.metrics.metric}>
         {report.metrics.map((m) => {
           const total = sum(report.users.map((u) => u.stats[m.key]));
           const active = m.key === metric.key;
@@ -68,7 +65,7 @@ export function MetricsPage() {
                 {percent(rate(total))}
               </Text>
               <Text fontSize="$2" color="$color10">
-                {total.count} of {total.opportunities} attendances
+                {t.metrics.attendances(total.count, total.opportunities)}
               </Text>
             </Card>
           );
@@ -76,9 +73,9 @@ export function MetricsPage() {
       </XStack>
 
       <XStack gap="$4" flexWrap="wrap" items="stretch">
-        <ChartCard title={`Most ${metric.label.toLowerCase()}`} subtitle={`Top ${TOP_USERS} people by times marked`}>
+        <ChartCard title={t.metrics.most(metric.label)} subtitle={t.metrics.topPeople(TOP_USERS)}>
           <HorizontalBars
-            empty="Nobody has been marked yet."
+            empty={t.metrics.nobodyMarked}
             data={report.users
               .filter((u) => u.stats[metric.key]?.count)
               .sort((a, b) => b.stats[metric.key].count - a.stats[metric.key].count || rate(b.stats[metric.key]) - rate(a.stats[metric.key]))
@@ -91,14 +88,14 @@ export function MetricsPage() {
                   value: s.count,
                   valueLabel: `${s.count} · ${percent(rate(s))}`,
                   tooltip: u.name,
-                  tooltipDetail: `${timesLabel(s.count)} in ${s.opportunities} tracked events (${percent(rate(s))})`,
+                  tooltipDetail: t.metrics.timesIn(t.metrics.times(s.count), s.opportunities, percent(rate(s))),
                 };
               })}
           />
         </ChartCard>
-        <ChartCard title={`${metric.label} rate per event`} subtitle={`Last ${RECENT_EVENTS} events tracking it, oldest first`}>
+        <ChartCard title={t.metrics.ratePerEvent(metric.label)} subtitle={t.metrics.lastEvents(RECENT_EVENTS)}>
           <RateColumns
-            empty="No events track this metric."
+            empty={t.metrics.noEvents}
             data={report.events
               .filter((e) => e.stats[metric.key])
               .slice(-RECENT_EVENTS)
@@ -109,7 +106,7 @@ export function MetricsPage() {
                   value: rate(s),
                   axisLabel: shortDate.format(new Date(e.startsAt)),
                   tooltip: `${e.name} · ${shortDate.format(new Date(e.startsAt))}`,
-                  tooltipDetail: `${s.count} of ${s.opportunities} attendees (${percent(rate(s))})`,
+                  tooltipDetail: t.metrics.ofAttendees(s.count, s.opportunities, percent(rate(s))),
                 };
               })}
           />
@@ -140,18 +137,19 @@ function PeopleTable({ report, sortBy: key, onSort }: { report: MetricsReport; s
   const rows = [...report.users].sort(
     (a, b) => (b.stats[key]?.count ?? 0) - (a.stats[key]?.count ?? 0) || rate(b.stats[key]) - rate(a.stats[key]) || a.name.localeCompare(b.name),
   );
+  const t = useT();
   const cell = { padding: '8px 12px', textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' };
 
   return (
     <Card p="$4" gap="$3" borderWidth={1} borderColor="$borderColor">
-      <H4>Everyone</H4>
+      <H4>{t.metrics.everyone}</H4>
       <YStack style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
               <th style={{ ...cell, textAlign: 'left' }}>
                 <Text fontSize="$2" color="$color10">
-                  Person
+                  {t.metrics.person}
                 </Text>
               </th>
               {report.metrics.map((m) => (
@@ -192,7 +190,7 @@ function PeopleTable({ report, sortBy: key, onSort }: { report: MetricsReport; s
                           </Text>
                         </Text>
                       ) : (
-                        <Text fontSize="$3" color="$color8" aria-label="Not tracked">
+                        <Text fontSize="$3" color="$color8" aria-label={t.metrics.notTracked}>
                           –
                         </Text>
                       )}

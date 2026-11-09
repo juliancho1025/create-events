@@ -1,25 +1,34 @@
+import type { Locale, Messages } from './i18n';
 import type { EventItem } from './types';
 
-const dateFormat = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-});
+const dateFormats = new Map<Locale, Intl.DateTimeFormat>();
 
-export const formatEventDate = (iso: string) => dateFormat.format(new Date(iso));
+/** "Sat, Jan 15, 2027, 6:30 PM" / "sáb, 15 de ene de 2027, 18:30" in the given language. */
+export function formatEventDate(iso: string, locale: Locale): string {
+  let format = dateFormats.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    dateFormats.set(locale, format);
+  }
+  return format.format(new Date(iso));
+}
 
 export const isPast = (event: Pick<EventItem, 'startsAt'>) => new Date(event.startsAt).getTime() <= Date.now();
 
 export const seatsLeft = (event: Pick<EventItem, 'capacity' | 'confirmedCount'>) =>
   Math.max(0, event.capacity - event.confirmedCount);
 
-export function availabilityLabel(event: EventItem): string {
+export function availabilityLabel(event: EventItem, t: Messages): string {
   const left = seatsLeft(event);
-  if (left > 0) return `${left} of ${event.capacity} seats left`;
-  return event.waitlistCount > 0 ? `Full · ${event.waitlistCount} on waitlist` : 'Full · waitlist open';
+  if (left > 0) return t.event.seatsLeft(left, event.capacity);
+  return event.waitlistCount > 0 ? t.event.fullWithWaitlist(event.waitlistCount) : t.event.fullWaitlistOpen;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { RegistrationStatus } from '@events/shared';
+import { useT, type RegistrationStatus } from '@events/shared';
 import { Text, Theme, XStack } from 'tamagui';
 
 export function StatusBadge({
@@ -8,12 +8,13 @@ export function StatusBadge({
   status: RegistrationStatus;
   waitlistPosition?: number | null;
 }) {
+  const t = useT();
   const confirmed = status === 'CONFIRMED';
   return (
     <Theme name={confirmed ? 'green' : 'yellow'}>
       <XStack bg="$color4" px="$2.5" py="$1" rounded="$10" self="flex-start">
         <Text fontSize="$2" fontWeight="600" color="$color11">
-          {confirmed ? "You're going" : `Waitlist #${waitlistPosition ?? '?'}`}
+          {confirmed ? t.event.youreGoing : t.event.waitlistPosition(waitlistPosition)}
         </Text>
       </XStack>
     </Theme>

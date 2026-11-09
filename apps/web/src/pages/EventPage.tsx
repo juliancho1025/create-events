@@ -15,6 +15,7 @@ import {
   useReviews,
   useSaveReview,
   useSetMetric,
+  useT,
 } from '@events/shared';
 import { AddPeople, AttendeeList, ErrorText, EventDetails, EventReviews } from '@events/ui';
 import { ArrowLeft, Lock, Pencil, Trash2 } from '@tamagui/lucide-icons-2';
@@ -38,6 +39,7 @@ export function EventPage() {
   const saveReview = useSaveReview(id);
   const deleteReview = useDeleteReview(id);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const t = useT();
 
   // Attendee list is only visible to admins and people signed up (confirmed or waitlisted).
   const canSeeAttendees = isAdmin || !!event?.myStatus;
@@ -53,7 +55,7 @@ export function EventPage() {
   const adminActions = isAdmin && (
     <XStack gap="$2" ml="auto">
       <Button size="$3" icon={<Pencil size={14} />} onPress={() => navigate(`/events/${id}/edit`)}>
-        Edit
+        {t.common.edit}
       </Button>
       {confirmDelete ? (
         <>
@@ -63,15 +65,15 @@ export function EventPage() {
             disabled={remove.isPending}
             onPress={() => remove.mutate(id, { onSuccess: () => void navigate('/', { replace: true }) })}
           >
-            Delete for everyone?
+            {t.event.deleteForEveryone}
           </Button>
           <Button size="$3" chromeless onPress={() => setConfirmDelete(false)}>
-            Keep
+            {t.common.keep}
           </Button>
         </>
       ) : (
         <Button size="$3" chromeless theme="red" icon={<Trash2 size={14} />} onPress={() => setConfirmDelete(true)}>
-          Delete
+          {t.common.delete}
         </Button>
       )}
     </XStack>
@@ -84,7 +86,7 @@ export function EventPage() {
   return (
     <YStack gap="$5">
       <Button self="flex-start" size="$3" chromeless icon={<ArrowLeft size={16} />} onPress={() => navigate('/')}>
-        All events
+        {t.event.allEvents}
       </Button>
 
       <XStack gap="$6" flexWrap="wrap" items="flex-start">
@@ -150,9 +152,9 @@ export function EventPage() {
             ) : (
               <YStack gap="$2" items="center" py="$4">
                 <Lock size={20} color="$color10" />
-                <H4>Who's going?</H4>
+                <H4>{t.event.whoIsGoing}</H4>
                 <Paragraph color="$color10" text="center">
-                  Sign up to see the attendee list.
+                  {t.event.signUpToSee}
                 </Paragraph>
               </YStack>
             )}

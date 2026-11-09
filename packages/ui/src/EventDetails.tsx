@@ -1,4 +1,4 @@
-import { formatEventDate, isPast, type EventItem } from '@events/shared';
+import { formatEventDate, isPast, useI18n, type EventItem } from '@events/shared';
 import { Calendar, MapPin } from '@tamagui/lucide-icons-2';
 import type { ReactNode } from 'react';
 import { Button, H2, Image, Paragraph, Spinner, XStack, YStack } from 'tamagui';
@@ -17,6 +17,7 @@ export interface EventDetailsProps {
 }
 
 export function EventDetails({ event, imageUri, onRegister, onCancel, pending, actions }: EventDetailsProps) {
+  const { t, locale } = useI18n();
   const past = isPast(event);
   const full = event.confirmedCount >= event.capacity;
 
@@ -26,10 +27,10 @@ export function EventDetails({ event, imageUri, onRegister, onCancel, pending, a
       <YStack gap="$3">
         <XStack gap="$2" flexWrap="wrap">
           {event.myStatus && <StatusBadge status={event.myStatus} waitlistPosition={event.myWaitlistPosition} />}
-          {past && <Pill label="Past" />}
+          {past && <Pill label={t.common.past} />}
         </XStack>
         <H2>{event.name}</H2>
-        <IconLine icon={<Calendar size={16} color="$color10" />} text={formatEventDate(event.startsAt)} />
+        <IconLine icon={<Calendar size={16} color="$color10" />} text={formatEventDate(event.startsAt, locale)} />
         <IconLine icon={<MapPin size={16} color="$color10" />} text={event.address} />
         <CapacityBar event={event} />
       </YStack>
@@ -38,11 +39,11 @@ export function EventDetails({ event, imageUri, onRegister, onCancel, pending, a
         {!past &&
           (event.myStatus ? (
             <Button theme="red" onPress={onCancel} disabled={pending} icon={pending ? <Spinner /> : undefined}>
-              {event.myStatus === 'WAITLISTED' ? 'Leave waitlist' : 'Cancel my spot'}
+              {event.myStatus === 'WAITLISTED' ? t.event.leaveWaitlist : t.event.cancelSpot}
             </Button>
           ) : (
             <Button theme="accent" onPress={onRegister} disabled={pending} icon={pending ? <Spinner /> : undefined}>
-              {full ? 'Join waitlist' : 'Sign up'}
+              {full ? t.event.joinWaitlist : t.event.signUp}
             </Button>
           ))}
         {actions}

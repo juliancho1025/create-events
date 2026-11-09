@@ -1,3 +1,4 @@
+import { useT } from '@events/shared';
 import type { DateTimeInputProps, ImageInputProps } from '@events/ui';
 import { ImagePlus } from '@tamagui/lucide-icons-2';
 import { useEffect, useRef } from 'react';
@@ -26,6 +27,7 @@ export function WebDateTimeInput({ id, value, onChange }: DateTimeInputProps) {
 }
 
 export function WebImageInput({ value, existingUri, onChange }: ImageInputProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const preview = value?.previewUri ?? existingUri;
 
@@ -35,14 +37,14 @@ export function WebImageInput({ value, existingUri, onChange }: ImageInputProps)
   return (
     <YStack gap="$3">
       {preview && (
-        <Image src={preview} width="100%" maxW={480} aspectRatio={16 / 9} objectFit="cover" rounded="$4" alt="Preview" />
+        <Image src={preview} width="100%" maxW={480} aspectRatio={16 / 9} objectFit="cover" rounded="$4" alt={t.eventForm.imagePreview} />
       )}
       <XStack gap="$3" items="center">
         <Button icon={<ImagePlus size={16} />} onPress={() => inputRef.current?.click()}>
-          {preview ? 'Replace image' : 'Choose image'}
+          {preview ? t.eventForm.replaceImage : t.eventForm.chooseImage}
         </Button>
         <Paragraph fontSize="$2" color="$color10">
-          JPEG, PNG, WebP or GIF · max 5 MB
+          {t.common.imageHint}
         </Paragraph>
       </XStack>
       <input

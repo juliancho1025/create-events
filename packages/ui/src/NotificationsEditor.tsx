@@ -1,4 +1,4 @@
-import { MAX_MINUTES_BEFORE, MAX_NOTIFICATIONS, type NotificationInput } from '@events/shared';
+import { MAX_MINUTES_BEFORE, MAX_NOTIFICATIONS, useT, type Messages, type NotificationInput } from '@events/shared';
 import { Plus, X } from '@tamagui/lucide-icons-2';
 import { Button, Input, Paragraph, Text, XStack, YStack } from 'tamagui';
 
@@ -16,9 +16,9 @@ export interface NotificationDraft {
   message: string;
 }
 
-const SUGGESTIONS: { label: string; draft: NotificationDraft }[] = [
-  { label: '1 day before', draft: { amount: '1', unit: 'days', message: 'Reminder: this event is tomorrow.' } },
-  { label: '1 hour before', draft: { amount: '1', unit: 'hours', message: 'Starts in an hour. See you there!' } },
+const suggestions = (t: Messages): { label: string; draft: NotificationDraft }[] => [
+  { label: t.notifications.suggestionDay, draft: { amount: '1', unit: 'days', message: t.notifications.suggestionDayMessage } },
+  { label: t.notifications.suggestionHour, draft: { amount: '1', unit: 'hours', message: t.notifications.suggestionHourMessage } },
 ];
 
 /** Largest unit that represents the value exactly, so "1440" reads as "1 days" -> "1 day". */
@@ -28,12 +28,12 @@ export function toDraft({ minutesBefore, message }: NotificationInput): Notifica
 }
 
 /** The draft as an API input, or an error message. */
-export function fromDraft(draft: NotificationDraft): NotificationInput | string {
+export function fromDraft(draft: NotificationDraft, t: Messages): NotificationInput | string {
   const amount = Number(draft.amount);
-  if (draft.amount.trim() === '' || !Number.isInteger(amount) || amount < 0) return 'Enter a whole number of 0 or more';
+  if (draft.amount.trim() === '' || !Number.isInteger(amount) || amount < 0) return t.notifications.errors.amount;
   const minutesBefore = amount * UNITS.find((u) => u.unit === draft.unit)!.minutes;
-  if (minutesBefore > MAX_MINUTES_BEFORE) return 'At most 30 days before';
-  if (!draft.message.trim()) return 'A message is required';
+  if (minutesBefore > MAX_MINUTES_BEFORE) return t.notifications.errors.tooFar;
+  if (!draft.message.trim()) return t.notifications.errors.message;
   return { minutesBefore, message: draft.message.trim() };
 }
 
@@ -56,6 +56,7 @@ export function NotificationsEditor({
   /** Already-sent notifications, shown read-only. */
   sent?: NotificationInput[];
 }) {
+  const t = useT();
   const full = value.length >= MAX_NOTIFICATIONS;
   const update = (i: number, patch: Partial<NotificationDraft>) =>
     onChange(value.map((d, j) => (j === i ? { ...d, ...patch } : d)));
@@ -65,7 +66,7 @@ export function NotificationsEditor({
       {sent.map((n, i) => (
         <XStack key={i} gap="$2" items="center" opacity={0.7}>
           <Text fontSize="$2" color="$color10" width={130}>
-            Sent · {describe(n.minutesBefore)}
+            {t.notifications.sent(describe(n.minutesBefore, t))}
           </Text>
           <Text fontSize="$3" flex={1}>
             {n.message}
@@ -73,10 +74,10 @@ export function NotificationsEditor({
         </XStack>
       ))}
       {value.length === 0 && sent.length === 0 && (
-        <Paragraph color="$color10">No notifications: attendees won't be reminded.</Paragraph>
+        <Paragraph color="$color10">{t.notifications.none}</Paragraph>
       )}
       {value.map((draft, i) => {
-        const parsed = fromDraft(draft);
+        const parsed = fromDraft(draft, t);
         const error = errors?.[i];
         const overdue =
           !error && typeof parsed !== 'string' && startsAt && startsAt.getTime() - parsed.minutesBefore * 60_000 < now;
@@ -89,7 +90,7 @@ export function NotificationsEditor({
                 value={draft.amount}
                 onChangeText={(amount) => update(i, { amount })}
                 inputMode="numeric"
-                aria-label="How long before"
+                aria-label={t.notifications.howLong}
               />
               <XStack>
                 {UNITS.map(({ unit }) => (
@@ -102,19 +103,19 @@ export function NotificationsEditor({
                     aria-pressed={draft.unit === unit}
                     onPress={() => update(i, { unit })}
                   >
-                    {unit}
+                    {t.notifications.units[unit]}
                   </Button>
                 ))}
               </XStack>
               <Text fontSize="$3" color="$color10" flex={1}>
-                before it starts
+                {t.notifications.beforeStart}
               </Text>
               <Button
                 size="$2"
                 circular
                 chromeless
                 icon={<X size={14} />}
-                aria-label="Remove notification"
+                aria-label={t.notifications.removeLabel}
                 onPress={() => onChange(value.filter((_, j) => j !== i))}
               />
             </XStack>
@@ -122,7 +123,7 @@ export function NotificationsEditor({
               size="$3"
               value={draft.message}
               onChangeText={(message) => update(i, { message })}
-              placeholder="Message attendees will see"
+              placeholder={t.notifications.messagePlaceholder}
               placeholderTextColor="$color8"
               maxLength={200}
             />
@@ -133,14 +134,14 @@ export function NotificationsEditor({
             )}
             {overdue && (
               <Text fontSize="$2" color="$color10">
-                That time has already passed: it will be sent right away.
+                {t.notifications.overdue}
               </Text>
             )}
           </YStack>
         );
       })}
       <XStack gap="$2" flexWrap="wrap">
-        {SUGGESTIONS.map(({ label, draft }) => (
+        {suggestions(t).map(({ label, draft }) => (
           <Button
             key={label}
             size="$2"
@@ -165,15 +166,15 @@ export function NotificationsEditor({
           disabled={full}
           onPress={() => onChange([...value, { amount: '30', unit: 'minutes', message: '' }])}
         >
-          Custom
+          {t.notifications.custom}
         </Button>
       </XStack>
     </YStack>
   );
 }
 
-function describe(minutesBefore: number): string {
-  if (minutesBefore === 0) return 'at start';
+function describe(minutesBefore: number, t: Messages): string {
+  if (minutesBefore === 0) return t.notifications.atStart;
   const { amount, unit } = toDraft({ minutesBefore, message: '' });
-  return `${amount} ${amount === '1' ? unit.slice(0, -1) : unit} before`;
+  return t.notifications.before(amount, (amount === '1' ? t.notifications.unitsOne : t.notifications.units)[unit]);
 }

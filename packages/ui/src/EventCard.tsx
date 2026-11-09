@@ -1,4 +1,4 @@
-import { formatEventDate, isPast, type EventItem } from '@events/shared';
+import { formatEventDate, isPast, useI18n, type EventItem } from '@events/shared';
 import { Calendar, MapPin } from '@tamagui/lucide-icons-2';
 import { Card, H4, Image, Text, XStack, YStack } from 'tamagui';
 import { CapacityBar } from './CapacityBar';
@@ -12,6 +12,7 @@ export interface EventCardProps {
 }
 
 export function EventCard({ event, imageUri, onPress }: EventCardProps) {
+  const { t, locale } = useI18n();
   return (
     <Card
       borderWidth={1}
@@ -27,11 +28,11 @@ export function EventCard({ event, imageUri, onPress }: EventCardProps) {
       <YStack p="$4" gap="$3">
         <XStack gap="$2" flexWrap="wrap">
           {event.myStatus && <StatusBadge status={event.myStatus} waitlistPosition={event.myWaitlistPosition} />}
-          {isPast(event) && <Pill label="Past" />}
+          {isPast(event) && <Pill label={t.common.past} />}
         </XStack>
         <H4 numberOfLines={2}>{event.name}</H4>
         <YStack gap="$1.5">
-          <IconLine icon={<Calendar size={14} color="$color10" />} text={formatEventDate(event.startsAt)} />
+          <IconLine icon={<Calendar size={14} color="$color10" />} text={formatEventDate(event.startsAt, locale)} />
           <IconLine icon={<MapPin size={14} color="$color10" />} text={event.address} />
         </YStack>
         <CapacityBar event={event} />

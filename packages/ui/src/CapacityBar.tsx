@@ -1,7 +1,8 @@
-import { availabilityLabel, type EventItem } from '@events/shared';
+import { availabilityLabel, useT, type EventItem } from '@events/shared';
 import { Text, Theme, XStack, YStack } from 'tamagui';
 
 export function CapacityBar({ event }: { event: EventItem }) {
+  const t = useT();
   const ratio = Math.min(1, event.confirmedCount / event.capacity);
   const full = ratio >= 1;
   return (
@@ -12,7 +13,7 @@ export function CapacityBar({ event }: { event: EventItem }) {
         </XStack>
       </Theme>
       <Text fontSize="$2" color="$color10">
-        {availabilityLabel(event)}
+        {availabilityLabel(event, t)}
       </Text>
     </YStack>
   );

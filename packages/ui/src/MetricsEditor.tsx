@@ -1,4 +1,4 @@
-import { RECOMMENDED_METRICS } from '@events/shared';
+import { useT } from '@events/shared';
 import { Plus, X } from '@tamagui/lucide-icons-2';
 import { useState } from 'react';
 import { Button, Input, Paragraph, Text, XStack, YStack } from 'tamagui';
@@ -11,6 +11,7 @@ const sameMetric = (a: string, b: string) =>
 
 /** Chips for the tracked metrics, one-click re-adds for removed recommendations, and a free-text add. */
 export function MetricsEditor({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
+  const t = useT();
   const [draft, setDraft] = useState('');
   const full = value.length >= MAX_METRICS;
   const has = (label: string) => value.some((m) => sameMetric(m, label));
@@ -20,12 +21,12 @@ export function MetricsEditor({ value, onChange }: { value: string[]; onChange: 
     onChange([...value, trimmed]);
     setDraft('');
   };
-  const suggestions = RECOMMENDED_METRICS.filter((m) => !has(m));
+  const suggestions = t.metricsEditor.recommended.filter((m) => !has(m));
 
   return (
     <YStack gap="$2.5">
       <XStack gap="$2" flexWrap="wrap">
-        {value.length === 0 && <Paragraph color="$color10">No metrics: attendees can't be marked for this event.</Paragraph>}
+        {value.length === 0 && <Paragraph color="$color10">{t.metricsEditor.none}</Paragraph>}
         {value.map((label) => (
           <XStack key={label} bg="$color4" pl="$3" pr="$1" py="$1" rounded="$10" items="center" gap="$1">
             <Text fontSize="$3">{label}</Text>
@@ -34,7 +35,7 @@ export function MetricsEditor({ value, onChange }: { value: string[]; onChange: 
               circular
               chromeless
               icon={<X size={12} />}
-              aria-label={`Remove ${label}`}
+              aria-label={t.metricsEditor.removeLabel(label)}
               onPress={() => onChange(value.filter((m) => m !== label))}
             />
           </XStack>
@@ -51,7 +52,7 @@ export function MetricsEditor({ value, onChange }: { value: string[]; onChange: 
           size="$3"
           value={draft}
           onChangeText={setDraft}
-          placeholder={full ? `Up to ${MAX_METRICS} metrics` : 'Add a metric, e.g. Dress code'}
+          placeholder={full ? t.metricsEditor.full(MAX_METRICS) : t.metricsEditor.placeholder}
           placeholderTextColor="$color8"
           maxLength={MAX_METRIC_LENGTH}
           disabled={full}
@@ -65,7 +66,7 @@ export function MetricsEditor({ value, onChange }: { value: string[]; onChange: 
           }}
         />
         <Button size="$3" disabled={full || !draft.trim() || has(draft)} onPress={() => add(draft)}>
-          Add
+          {t.common.add}
         </Button>
       </XStack>
     </YStack>

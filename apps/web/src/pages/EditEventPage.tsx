@@ -1,4 +1,4 @@
-import { useApi, useEvent, useEventNotifications, useUpdateEvent } from '@events/shared';
+import { useApi, useEvent, useEventNotifications, useT, useUpdateEvent } from '@events/shared';
 import { EventForm } from '@events/ui';
 import { useNavigate, useParams } from 'react-router';
 import { Card, H2, YStack } from 'tamagui';
@@ -11,6 +11,7 @@ export function EditEventPage() {
   const api = useApi();
   const { data: event, isPending, error } = useEvent(id);
   const update = useUpdateEvent(id);
+  const t = useT();
   // The form copies its initial values once, so wait for both.
   const notifications = useEventNotifications(id, true);
 
@@ -23,7 +24,7 @@ export function EditEventPage() {
 
   return (
     <YStack gap="$4" maxW={720} width="100%" mx="auto">
-      <H2>Edit event</H2>
+      <H2>{t.event.editTitle}</H2>
       <Card p="$5" borderWidth={1} borderColor="$borderColor">
         <EventForm
           mode="edit"

@@ -1,5 +1,5 @@
-import { useApiContext, useCurrentUser } from '@events/shared';
-import { initials } from '@events/ui';
+import { useApiContext, useCurrentUser, useT } from '@events/shared';
+import { initials, LanguageSelector } from '@events/ui';
 import { BarChart3, Bell, BellOff, CalendarDays, LogOut } from '@tamagui/lucide-icons-2';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { Avatar, Button, Text, XStack, YStack } from 'tamagui';
@@ -25,13 +25,15 @@ export function RequireAuth() {
 
 export function RequireAdmin() {
   const { isAdmin } = useCurrentUser();
-  return isAdmin ? <Outlet /> : <PageState error={new Error('Admins only')} />;
+  const t = useT();
+  return isAdmin ? <Outlet /> : <PageState error={new Error(t.common.adminsOnly)} />;
 }
 
 export function Layout() {
   const { user, isAdmin } = useCurrentUser();
   const { api, signOut } = useApiContext();
   const navigate = useNavigate();
+  const t = useT();
 
   return (
     <YStack minH="100vh">
@@ -51,19 +53,20 @@ export function Layout() {
           <XStack gap="$2" items="center">
             <CalendarDays size={22} color="$accent10" />
             <Text fontSize="$6" fontWeight="700">
-              Events
+              {t.layout.appName}
             </Text>
           </XStack>
         </Link>
         {user && (
           <XStack gap="$3" items="center">
+            <LanguageSelector />
             <PushToggle />
             {isAdmin && (
               <Button size="$3" chromeless icon={<BarChart3 size={16} />} onPress={() => navigate('/metrics')}>
-                Metrics
+                {t.layout.metrics}
               </Button>
             )}
-            <Link to="/profile" aria-label="Your profile" style={{ textDecoration: 'none' }}>
+            <Link to="/profile" aria-label={t.layout.profile} style={{ textDecoration: 'none' }}>
               <XStack gap="$3" items="center">
                 <Avatar circular size="$3">
                   {user.avatarUrl && <Avatar.Image src={api.resolveUrl(user.avatarUrl)} />}
@@ -78,8 +81,8 @@ export function Layout() {
                     {user.name}
                   </Text>
                   <Text fontSize="$1" color="$color10">
-                    {user.username ? `@${user.username}` : isAdmin ? 'Admin' : 'Member'}
-                    {user.username && isAdmin ? ' · Admin' : ''}
+                    {user.username ? `@${user.username}` : isAdmin ? t.layout.admin : t.layout.member}
+                    {user.username && isAdmin ? ` · ${t.layout.admin}` : ''}
                   </Text>
                 </YStack>
               </XStack>
@@ -89,7 +92,7 @@ export function Layout() {
               chromeless
               icon={<LogOut size={16} />}
               onPress={() => void unsubscribe(api).finally(signOut)}
-              aria-label="Log out"
+              aria-label={t.layout.logOut}
             />
           </XStack>
         )}
@@ -101,18 +104,15 @@ export function Layout() {
   );
 }
 
-const PUSH_HINTS: Record<string, string> = {
-  denied: 'Notifications are blocked for this site in your browser settings',
-  unavailable: 'Push notifications are not configured on the server',
-};
-
 /** Bell in the header: turns this browser's push notifications on or off. Hidden where push can't work. */
 function PushToggle() {
   const { state, pending, error, enable, disable } = usePushNotifications();
+  const t = useT();
+  const hints: Record<string, string> = { denied: t.layout.pushDenied, unavailable: t.layout.pushUnavailable };
   if (state === null || state === 'unsupported') return null;
   const on = state === 'on';
   const blocked = state === 'denied' || state === 'unavailable';
-  const label = error?.message ?? PUSH_HINTS[state] ?? (on ? 'Turn off notifications' : 'Turn on notifications');
+  const label = error?.message ?? hints[state] ?? (on ? t.layout.pushOff : t.layout.pushOn);
   return (
     <Button
       size="$3"
